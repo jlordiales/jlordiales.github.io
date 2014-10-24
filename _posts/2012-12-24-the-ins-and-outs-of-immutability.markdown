@@ -85,23 +85,14 @@ public class Book {
 {% endhighlight %}
 
 We'll go through the important points in this pretty simple class. First of all, as you've probably noticed, I'm using the builder pattern again. This is not just because I'm a big fan of it but also because I wanted to illustrate a few points that I didn't want to get into my previous post without first giving you a basic understanding of the concept of immutability. Now, let's go through the 5 steps that I mentioned you need to follow to make a class immutable and see if they hold valid for this _Book_ example:
-
-
-
-
 	
-    * **Don’t provide any public methods that modify the object’s state**. Notice that the only methods on the class are its private constructor and getters for its properties but no method to change the object's state.
-
+- **Don’t provide any public methods that modify the object’s state**. Notice that the only methods on the class are its private constructor and getters for its properties but no method to change the object's state.
 	
-    * **Prevent the class from being extended**. This one is quite tricky. I mentioned that the easiest way to ensure this was to make the class _final_ but the _Book _class is clearly not final. However, notice that the only constructor available is _private_.  The compiler makes sure that a class without public or protected constructors cannot be  subclassed. So in this case the _final_ keyword on the class declaration is not necessary but it might be a good idea to include it anyway just to make your intention clear to anyone who sees your code.
-
+- **Prevent the class from being extended**. This one is quite tricky. I mentioned that the easiest way to ensure this was to make the class _final_ but the _Book _class is clearly not final. However, notice that the only constructor available is _private_.  The compiler makes sure that a class without public or protected constructors cannot be  subclassed. So in this case the _final_ keyword on the class declaration is not necessary but it might be a good idea to include it anyway just to make your intention clear to anyone who sees your code.
 	
-    * **Make all fields _final_**. Pretty straightforward, all attributes on the class are declared as _final_.
-
+- **Make all fields _final_**. Pretty straightforward, all attributes on the class are declared as _final_.
 	
-    * **Never provide access to any mutable attribute**. This one is actually quite interesting. Notice how the _Book_ class has a _List<String>_ attribute that is declared as _final_ and whose value is set on the class constructor. However, this _List_ is a mutable object. That is, while the _reviews_ reference cannot change once it is set, the content of the list can. A client with a reference to the same list could add or delete an element and, as a result, change the state of the _Book_ object after its creation. For this reason, note that on the _Book_ constructor we don't assign the reference directly. Instead, we use the [Guava library](http://code.google.com/p/guava-libraries/) to make a copy of the list by calling "`this.reviews = Lists.newArrayList(builder.reviews);`". The same situation can be seen on the `getReviews` method, where we return a copy of the list instead of the direct reference. It is worth noting that this example might be a bit oversimplified, because the _reviews_ list can only contain strings, which are immutable. If the type of the list is a mutable class then you would also have to make a copy of each object in the list and not just the list itself.
-
-
+- **Never provide access to any mutable attribute**. This one is actually quite interesting. Notice how the _Book_ class has a _List<String>_ attribute that is declared as _final_ and whose value is set on the class constructor. However, this _List_ is a mutable object. That is, while the _reviews_ reference cannot change once it is set, the content of the list can. A client with a reference to the same list could add or delete an element and, as a result, change the state of the _Book_ object after its creation. For this reason, note that on the _Book_ constructor we don't assign the reference directly. Instead, we use the [Guava library](http://code.google.com/p/guava-libraries/) to make a copy of the list by calling "`this.reviews = Lists.newArrayList(builder.reviews);`". The same situation can be seen on the `getReviews` method, where we return a copy of the list instead of the direct reference. It is worth noting that this example might be a bit oversimplified, because the _reviews_ list can only contain strings, which are immutable. If the type of the list is a mutable class then you would also have to make a copy of each object in the list and not just the list itself.
 
 That last point illustrates why immutable classes result in cleaner designs and easier to read code. You can just share around those immutable objects without having to worry about defensive copies. In fact, you should never make any copies at all because any copy of the object would be forever equal to the original. A corollary is that immutable objects are just plain simple. They can be in only one state and they keep that state for their entire life. You can use the class constructor to check any invariants (i,e,. conditions that need to be valid on the class like range of values for one of its attributes) and then you can ensure that those invariants will remain true without any effort on your part or your clients.
 
