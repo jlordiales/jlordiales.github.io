@@ -68,12 +68,16 @@ So when do we stop solving sub-problems? We can stop as soon as we get to a case
 What we have done so far is defining the solution to our problem in terms of the solution to a smaller sub-problem of the same type and identified the base case when we already know what the result is. This should be a clear hint that a recursive algorithm can be applied.
 But first, lets translate the three choices discussed previously describing the relationship between sub-problems into something that will be more helpful when trying to code this. The recurrence relation can be defined as:
 
-$latex editDistance(A,B) = min =\begin{cases} editDistance(A[1..n],B[1..m]) + replaceCost(A[0],B[0])\\editDistance(A[1..n],B[0..m]) + 1\\editDistance(A[0..n],B[1..m]) +1\end{cases}$
+$$
+\begin{align*}
+& editDistance(A,B) = min =\begin{cases} editDistance(A[1..n],B[1..m]) + replaceCost(A[0],B[0])\\editDistance(A[1..n],B[0..m]) + 1\\editDistance(A[0..n],B[1..m]) +1\end{cases}
+\end{align*}
+$$
 
 The first case of the previous formula is when we replace _A[0]_ by _B[0]_, the second one is when we delete _A[0]_ and the last one is when we insert into _A_.
 The base cases are:
-$latex editDistance(A,"") = length(A)$
-$latex editDistance("",B) = length(B)$
+$$ editDistance(A,"") = length(A)$$
+$$ editDistance("",B) = length(B)$$
 
 Notice that the case where both strings are empty is already covered by the first base case because _length(A) == length("") == 0_.
 
@@ -235,37 +239,41 @@ public class DPBottomUpEditDistance implements EditDistance {
 Here we create a matrix to hold the values of the edit distances of the different substrings. Instead of keeping references to all the different substrings, like we did on the memoized version, we just keep 2 indices. So _minCosts[i][j]_ is the value for the edit distance between _word1[i..n]_ and _word2[j..m]_. Given this structure, what is the smallest problem for which the solution is trivial? The one that considers the two last characters of each String: if both characters are equal then their edit distance is 0, otherwise is 1.
 Lets follow the algorithm through the original example of "cat" and "cars" to better understand how it works. Suppose _word1 = [c, a, t]_ and _word2 = [c, a, r, s]_. Then, our matrix will have a size of 3x4 with all places initially set to 0:
 
-$latex  \begin{bmatrix}
+$$  \begin{bmatrix}
 0 & 0 & 0 & 0 \\
 0 & 0 & 0 & 0 \\
 0 & 0 & 0 & 0 
-\end{bmatrix}$
+\end{bmatrix}
+$$
 
 Next we compare the two last characters of both Strings, so "t" and "s". Since they are different we update _minCosts[2][3]_ with 1:
 
-$latex  \begin{bmatrix}
+$$  \begin{bmatrix}
 0 & 0 & 0 & 0 \\
 0 & 0 & 0 & 0 \\
 0 & 0 & 0 & 1 
-\end{bmatrix}$
+\end{bmatrix}
+$$
 
 Once we have that value, we can calculate all the other values for the last row and last column. For instance, what does _minCosts[2][2]_ mean? According to our definition is the edit distance between _word1[2..2]_ and _word2[2..3]_, which in our case means the edit distance between "t" and "rs". But since we already know that the edit distance between "t" and "s" is 1 (because we can look for that value on the matrix) any extra letter we add to the second string while leaving the first one fixed can only increase the distance by 1. So _minCosts[2][2]_ is equal to _minCosts[2][3] + 1_, _minCosts[2][1]_ is equal to _minCosts[2][2] + 1_ and _minCosts[2][0]_ is equal to _minCosts[2][1] + 1_.
 The same reasoning applies if we leave the column fixed and move up through the rows. After this two initial loops our matrix looks like this:
 
-$latex  \begin{bmatrix}
+$$  \begin{bmatrix}
 0 & 0 & 0 & 3 \\
 0 & 0 & 0 & 2 \\
 4 & 3 & 2 & 1 
-\end{bmatrix}$
+\end{bmatrix}
+$$
 
 Now we can easily fill in our matrix by following the recurrence formula we defined in the beginning. For each cell we will need the value of the cell to its right, the cell directly below and the cell on its right diagonal. So we can traverse the matrix from bottom to top and from right to left. Applying the recurrence formula to _minCosts[1][2]_ for example, we get that its value is 2. With this value we can calculate _minCosts[1][1]_, _minCosts[1][0]_ and the values for the first row.
 Our final matrix is:
 
-$latex  \begin{bmatrix}
+$$  \begin{bmatrix}
 2 & 3 & 3 & 3 \\
 3 & 2 & 2 & 2 \\
 4 & 3 & 2 & 1 
-\end{bmatrix}$
+\end{bmatrix}
+$$
 
 So now that we have all our matrix filled up, what is the answer to our original problem? Remember once again that _minCosts[i][j]_ is the value for the edit distance between _word1.substring(i)_ and _word2.substring(j)_. Therefore, since _word1.substring(0) == word1_, our final answer is the value sitting at _minCosts[0][0]_.
 
