@@ -3,9 +3,12 @@ layout: page
 title: About
 permalink: /about/
 ---
+This blog will contain random posts on software development best practices, methodologies and patterns, 
+particularly those oriented towards the JVM platform.
 
-This is the base Jekyll theme. You can find out more info about customizing your Jekyll theme, as well as basic Jekyll usage documentation at [jekyllrb.com](http://jekyllrb.com/)
+A little bit about me: 
 
-You can find the source code for the Jekyll new theme at: [github.com/jglovier/jekyll-new](https://github.com/jglovier/jekyll-new)
+Professional software developer and scientist. Naturally curious and critical thinker. 
+Always looking for new challenges: “If you’re the smartest person in the room, then you are in the wrong room”.
 
-You can find the source code for Jekyll at [github.com/jekyll/jekyll](https://github.com/jekyll/jekyll)
+You can find me on [LinkedIn](http://br.linkedin.com/in/jordiales/), [Github](https://github.com/jlordiales) or contact me on jlordiales@gmail.com
