@@ -7,8 +7,8 @@ disqus_shortname: jlordiales
 reading_time:     false
   
 #Your site's domain goes here. Leave localhost server or blank when working locally.
-#url: "http://jlordiales.me" # the base hostname & protocol for your site
-url: "http://localhost:4000"
+url: "http://jlordiales.me" # the base hostname & protocol for your site
+#url: "http://localhost:4000"
 
 # Owner/author information
 owner:
