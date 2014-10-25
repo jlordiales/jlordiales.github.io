@@ -14,13 +14,9 @@ tags:
 - dynamic programming
 ---
 
-Wow, it's been a while since I've written anything here. Between changing jobs, working on my PhD and moving to a new country I guess you could say I've been pretty busy.
-
-But at the same time, together with all these changes in my life there's a ton of new things that I'm learning almost every day. And, [as many others](http://java.dzone.com/articles/why-you-should-write-blog-post), I feel that writing about them in a way that is easy for others to understand is one of the best ways to consolidate my own learning. So I'll try to write here more often from now on.
-
-So with that covered lets move to the important stuff. For some reason, lately I've been very interested in refreshing old concepts from algorithms and data structures that were a little rusty. Together with these old concepts also came some new concepts and techniques which I've never heard about before. But I will address them on separate posts.
-
-On this post I wanted to talk about Dynamic Programming. If you ever took an algorithms university course then you have probably heard about it. If you haven't, here's a good chance to learn something extremely useful, easy and intuitive (at least when you understand it properly).
+On this post I wanted to talk about Dynamic Programming. If you ever took an algorithms university 
+course then you have probably heard about it. If you haven't, here's a good chance to learn 
+something extremely useful, easy and intuitive (at least when you understand it properly).
 
 So what exactly is Dynamic Programming? I won't go into much theory because you can already find all that if you do a simple google search. I will define it as "smart recursion" and, as usual I'll clarify this with an example.
 

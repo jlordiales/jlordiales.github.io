@@ -16,29 +16,30 @@ tags:
 - technology
 ---
 
-So in my first post I talked a little bit about the [builder pattern]({% post_url 2012-12-13-the-builder-pattern-in-practice %}) and I mentioned a really powerful but yet overlooked concept: immutability.
+In my first post I talked a little bit about the 
+[builder pattern]({% post_url 2012-12-13-the-builder-pattern-in-practice %}) 
+and I mentioned a really powerful but yet overlooked concept: immutability.
+What is an immutable class? It's simply a class whose instances can't be modified. 
+Every value for the class' attributes is set on their declaration or in its constructor 
+and they keep those values for the rest of the object's life-cycle. 
 
-What is an immutable class? It's simply a class whose instances can't be modified. Every value for the class' attributes is set on their declaration or in its constructor and they keep those values for the rest of the object's life-cycle. Java has quite a few immutable classes, such as _String_, all the boxed primitives (_Double_, _Integer_, _Float_, etc), _BigInteger_ and _BigDecimal_ among others. There is a good reason for this: immutable classes are easier to design, implement and use than mutable classes. Once they are instantiated they can only be in one state so they are less error prone and, as we'll see later in this post, they are more secure.
+Java has quite a few immutable classes, such as _String_, all the boxed 
+primitives (_Double_, _Integer_, _Float_, etc), _BigInteger_ and _BigDecimal_ among others. 
+There is a good reason for this: immutable classes are easier to design, implement and use than mutable classes. 
+Once they are instantiated they can only be in one state so they are less error prone 
+and, as we'll see later in this post, they are more secure.
 
 How do you ensure that a class is immutable? Just follow these 5 simple steps:
-
-
-
 	
   1. **Don't provide any public methods that modify the object's state**, also known as mutators (such as setters).
-
 	
   2. **Prevent the class from being extended**. This doesn't allow any malicious or careless class to extend our class and compromise its immutable behavior. The usual and easier way to do this is to mark the class as _final_, but there's another way that I'll mention in this post.
-
 	
   3. **Make all fields _final_**. This is a way to let the compiler enforce point number 1 for you. Additionally, it clearly lets anyone who sees your code know that you don't want those fields to change their values once they are set.
-
 	
   4. **Make all fields private**. This one should be pretty obvious and [you should follow it](http://www.javaworld.com/jw-05-2001/jw-0518-encapsulation.html) regardless of whether you're taking immutability into consideration or not, but I'm mentioning this just in case.
-
 	
   5. **Never provide access to any mutable attribute**. If your class has a mutable object as one of its properties (such as a _List_, a _Map_ or any other mutable object from your domain problem) make sure that clients of your class can never get a reference to that object. This means that you should never directly return a reference to them from an accessor (e.g., a getter) and you should never initialize them on your constructor with a reference passed as parameter from a client. You should always make defensive copies in this case.
-
 
 That's a lot of theory and no code, so lets see what a simple immutable class looks like and how it deals with the 5 steps I mentioned before:
 

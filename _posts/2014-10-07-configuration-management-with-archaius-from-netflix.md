@@ -15,7 +15,10 @@ tags:
 - netflix
 ---
 
-So you usually need to read some configuration variables from your app. Maybe you read them from the system properties like:
+In this post I'll talk about [Archaius](https://github.com/Netflix/archaius), a pretty cool and easy to use
+Configuration Management tool from Netflix.
+
+Have you ever read your configuration variables like this?
 
 {% highlight java %}
 String prop = System.getProperty("myProperty");
@@ -28,11 +31,23 @@ try {
 myMethod(x);
 {% endhighlight %}
 
-Or maybe you have a properties file that you read using [Spring](http://docs.spring.io/spring/docs/current/javadoc-api/org/springframework/context/annotation/PropertySource.html). Or maybe you have a simple key/value table in your DB with some properties that you read from there? Or you get them from an external REST endpoint? Or from other type of key/value store like Redis or Memcached?
+Or maybe you have a properties file that you read using 
+[Spring](http://docs.spring.io/spring/docs/current/javadoc-api/org/springframework/context/annotation/PropertySource.html). 
+Or maybe you have a simple key/value table in your DB with some properties that you read from there? 
+Or you get them from an external REST endpoint? Or from other type of key/value store like Redis or Memcached?
 
-Whatever the case might be your configuration variables might be coming from a lot of different sources and, specially if your app uses more than one, this can become difficult to maintain. Additionally, you don't want to do a re-deploy every time you need to change the value of one of your properties, particularly for [feature toogles](http://martinfowler.com/bliki/FeatureToggle.html).
+Whatever the case might be your configuration variables might be coming from a 
+lot of different sources and, specially if your app uses more than one, this can 
+become difficult to maintain. Additionally, you don't want to do a re-deploy every time you need 
+to change the value of one of your properties, particularly 
+for [feature toogles](http://martinfowler.com/bliki/FeatureToggle.html).
 
-Luckily, the Netflix folks already had these issues and came up with a solution that they were kind enough to open source. If you haven't seen [Netflix Github repository](http://netflix.github.io/) I strongly recommend that you take a look. They have some serious cool projects that could be just the thing your application needs. One of those projects is the one that concerns us today: [Archaius](https://github.com/Netflix/archaius).
+Luckily, the Netflix folks already had these issues and came up with a solution 
+that they were kind enough to open source. If you haven't seen 
+[Netflix Github repository](http://netflix.github.io/) I strongly recommend that 
+you take a look. They have some serious cool projects that could be just the thing 
+your application needs. One of those projects is the one that concerns us 
+today: [Archaius](https://github.com/Netflix/archaius).
 
 Their wiki and examples should give you a very good idea of what Archaius is and what it is useful for. For now I'll just say that Archaius is an extension of [Apache's Common Configuration library](http://commons.apache.org/proper/commons-configuration/) that allows you to retrieve properties from several dynamic sources and that it solves all the issues mentioned previously (heterogeneous sources of properties, run-time changes, etc.).
 
