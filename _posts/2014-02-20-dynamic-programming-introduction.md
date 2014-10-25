@@ -1,6 +1,7 @@
 ---
 author: jlordiales
 comments: true
+share: true
 date: 2014-02-20
 layout: post
 slug: dynamic-programming-introduction

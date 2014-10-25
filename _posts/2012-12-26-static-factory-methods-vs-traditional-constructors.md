@@ -1,6 +1,7 @@
 ---
 author: jlordiales
 comments: true
+share: true
 date: 2012-12-26
 layout: post
 slug: static-factory-methods-vs-traditional-constructors

@@ -1,6 +1,7 @@
 ---
 author: jlordiales
 comments: true
+share: true
 date: 2012-12-28
 layout: post
 slug: when-git-ignores-your-gitignore

@@ -1,6 +1,7 @@
 ---
 author: jlordiales
 comments: true
+share: true
 date: 2014-10-07
 layout: post
 slug: configuration-management-with-archaius-from-netflix

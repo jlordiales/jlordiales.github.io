@@ -1,6 +1,7 @@
 ---
 author: jlordiales
 comments: true
+share: true
 date: 2012-12-13
 layout: post
 slug: the-builder-pattern-in-practice
