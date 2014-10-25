@@ -1,6 +1,7 @@
 ---
 author: jlordiales
 comments: true
+latex: true
 date: 2014-03-01
 layout: post
 slug: dynamic-programming-edit-distance
