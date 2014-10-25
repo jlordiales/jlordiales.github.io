@@ -1,7 +1,7 @@
 ---
 layout: page
 permalink: /about/
-title: About the Theme
+title: About the Blog
 tags: [Jekyll, theme, modern, minimal, responsive]
 image:
   feature: abstract-5.jpg
@@ -10,24 +10,16 @@ image:
 share: true
 ---
 
-They say three times the charm, so here is another free responsive Jekyll theme for you. I've learned a ton since open sourcing my first two themes [on Github](http://github.com/mmistakes), and wanted to try a few new things this time around. If you've used my previous themes most of this should be familiar territory...
+They say the best way to learn something is to try to explain it to someone else
+assumming that they have no previous knowledge about the subject.
+That was the main driver almost two years ago for me to start writting this
+blog.
+Although I haven't had as much time as I would have wished to write, I can now
+say with confidence that the statement of the previous paragraph is completely
+true, at least for me.
 
-## What HPSTR brings to the table:
-
-* Responsive templates for post, page, and post index `_layouts`. Looks great on mobile, tablet, and desktop devices.
-* Gracefully degrads in older browsers. Compatible with Internet Explorer 8+ and all modern browsers.  
-* Modern and minimal design.
-* Sweet animated menu.
-* Background image support.
-* Readable typography to make your words shine.
-* Support for large images to call out your favorite posts.
-* Comments powered by [Disqus](http://disqus.com) if you choose to enable.
-* Simple and clear permalink structure[^1].
-* [Open Graph](https://developers.facebook.com/docs/opengraph/) and [Twitter Cards](https://dev.twitter.com/docs/cards) support for a better social sharing experience.
-* Simple [custom 404 page]({{ site.url }}/404.html) to get you started.
-* Stylesheets for Pygments and Coderay [syntax highlighting]({{ site.url }}/code-highlighting-post/) to make your code examples look snazzy
-* [Grunt](http://gruntjs.com) build script for easy theme development
-
-<div markdown="0"><a href="{{ site.url }}/theme-setup" class="btn btn-info">Install the Theme</a></div>
-
-[^1]: Example: *domain.com/category-name/post-title*
+A side effect of writing to understand things better is that I usually use my
+own blog as a quick remainder of things that I once knew but that are now gone
+from my long term memory.
+Hopefully, in the process of reaching these two goals, I can also help other
+people who are working on the same subjects.
