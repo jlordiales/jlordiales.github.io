@@ -158,7 +158,8 @@ the object will not have a complete state until all the _setX_ methods have been
 invoked. This means that some part of the client application might see this
 object and assume that is already constructed while that's actually not the
 case.  The second disadvantage of this approach is that now the _User_ class is
-mutable. You're loosing all the benefits of immutable objects.
+mutable. You're loosing all the benefits of 
+[immutable]({% post_url 2012-12-24-the-ins-and-outs-of-immutability %}) objects.
 
 Fortunately there is a third choice for these cases, the builder pattern. The
 solution will look something like the following.
@@ -296,7 +297,7 @@ our _User_ example this could look like the following:
 {% highlight java %}
 public User build() {
   User user = new user(this);
-  if (user.getAge() 120) {
+  if (user.getAge() > 120) {
     throw new IllegalStateException(“Age out of range”); // thread-safe
   }
   return user;
@@ -310,7 +311,7 @@ things like this:
 
 {% highlight java %}
 public User build() {
-  if (age 120) {
+  if (age > 120) {
     throw new IllegalStateException(“Age out of range”); // bad, not thread-safe
   }
   // This is the window of opportunity for a second thread to modify the value of age
