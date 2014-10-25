@@ -74,6 +74,16 @@ task :new_page, :title do |t, args|
   end
 end
 
+begin
+  require 'rspec/core/rake_task'
+
+  RSpec::Core::RakeTask.new(:spec)
+
+  task :default => :spec
+rescue LoadError
+  # no rspec available
+end
+
 def get_stdin(message)
   print message
   STDIN.gets.chomp
