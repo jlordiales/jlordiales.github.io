@@ -1,5 +1,9 @@
 source 'https://rubygems.org'
 
 gem 'jekyll'
-gem 'jekyll-import'
-gem 'hpricot'
+gem 'kramdown'
+gem 'coderay'
+gem 'rake'
+gem 'thor'
+gem 'activesupport'
+gem 'stringex'
