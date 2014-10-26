@@ -1,32 +1,29 @@
 require 'yaml'
 describe "Posts" do
-
-  before(:each) do
-    @posts = Dir["_posts/**/*.md"]
-  end
+  let(:posts) {Dir["_posts/**/*.md"]}
 
   it "should have comments enabled" do
-    @posts.each {|post| has_comments_enabled?(post) }
+    posts.each {|post| has_comments_enabled?(post) }
   end
 
   it "should have sharing enabled" do
-    @posts.each {|post| has_sharing_enabled?(post) }
+    posts.each {|post| has_sharing_enabled?(post) }
   end
 
   it "uses the post layout" do
-    @posts.each {|post| uses_post_layout?(post) }
+    posts.each {|post| uses_post_layout?(post) }
   end
 
   it "has jlordiales as author" do
-    @posts.each {|post| author_equals_to(post, "jlordiales") }
+    posts.each {|post| author_equals_to(post, "jlordiales") }
   end
 
   it "has a publication date" do
-    @posts.each {|post| has_a_publication_date?(post) }
+    posts.each {|post| has_a_publication_date?(post) }
   end
 
   it "has a title" do
-    @posts.each {|post| has_a_title?(post) }
+    posts.each {|post| has_a_title?(post) }
   end
 
 
