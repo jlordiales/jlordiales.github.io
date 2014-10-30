@@ -135,8 +135,8 @@ work. I decided to give [Exitwp](https://github.com/thomasf/exitwp) a shot. The
 setup was pretty straightforward following the project's README. I needed to
 have pyton installed and the same wordpress.xml file that I had exported before
 from Wordpress. I ran the app and... it almost worked!
-Now all my posts were in Markdown format except for my code lists. Definetely
-progress!
+Now all my posts were in Markdown format (including their tags and categories)
+except for my code lists. Definetely progress!
 Now, my source code snippets in Wordpress followed the format:
 
 {% highlight bash %}
@@ -166,4 +166,117 @@ body_replace: {
 {% endraw %} {% endhighlight %}
 
 And there I had it. All my posts were now in Markdown format, including my code
-snippets
+snippets.
+I was missing one thing though, my comments.
+
+# Migrating my old comments
+Jekyll being a static HTML generator, one of the things you can not do out of
+the box is having comments on your posts. Luckily there are plenty of external
+providers that you can plug into your HTML with a simple JavaScript block. One
+of these providers (and one of the more popular ones) is
+[Disqus](https://disqus.com/)
+
+Since I always used Wordpress' own comments system I didn't have a Disqus
+account. So the first thing for me was creating an account there. After you do
+that you get a [Universal Code](https://disqus.com/admin/universalcode/) that
+you can add to any page. It looks something like this:
+
+{% highlight html %}
+<div id="disqus_thread"></div>
+<script type="text/javascript">
+/* * * CONFIGURATION VARIABLES: EDIT BEFORE PASTING INTO YOUR WEBPAGE * * */
+var disqus_shortname = ''; // required: replace example with your forum shortname
+
+/* * * DON'T EDIT BELOW THIS LINE * * */
+(function() {
+ var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+ dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+ (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+ })();
+</script>
+<noscript>Please enable JavaScript to view the <a href="http://disqus.com/?ref_noscript">comments powered by Disqus.</a></noscript>
+{% endhighlight %}
+
+Where do you put that code? Well, Jekyll has the concept of
+[layout](http://jekyllrb.com/docs/structure/), which is basically a wrapper
+around your posts. The default post layout that you get with Jekyll when you do
+a _jekyll new blog_ looks like this:
+
+{% highlight html %}
+
+---
+layout: default
+---
+<div class="post">
+
+  <header class="post-header">
+    <h1 class="post-title">{{ page.title }}</h1>
+    <p class="post-meta">{{ page.date | date: "%b %-d, %Y" }}{% if page.author %} • {{ page.author }}{% endif %}{% if page.meta %} • {{ page.meta }}{% endif %}</p>
+  </header>
+
+  <article class="post-content">
+    {{ content }}
+  </article>
+
+</div>
+{% endhighlight %}
+
+A simple header with the post title, author and date followed by the content of
+your post. 
+Since all posts will use this same layout (assuming you want that) you could
+just copy paste the Disqus code in this layout and then all your posts would
+have comments enabled.
+
+Even though that works, if you start doing the same for other services
+(Analytics, Social media, etc.) your post layout starts to get cluttered with
+lot of unrelated stuff. What I did instead was to create a
+"disqus\_comments.html" file inside the \_includes directory created by Jekyll
+with the content I showed before.
+The html files in this directory are partials that can be included by your posts
+and layouts in order to facilitate reuse and, like in my case, to keep things
+cleaner.
+So now instead of adding all the Disqus universal code in our layout we can just
+say:
+
+{% highlight text %} {% raw %}
+{% if page.comments %}{% include disqus_comments.html %}{% endif %}
+{% endraw %} {% endhighlight %}
+
+The "if page.comments" part allows you to decide on a post by post basis if you
+want to enable comments or not. You only need to say "comments: true" or
+"comments: false" on your [YAML front
+matter](http://jekyllrb.com/docs/frontmatter/)
+
+We now have Disqus comments integrated into our blogs but we still haven't
+migrated our old comments from Wordpress to Disqus. Remember that
+"wordpress.xml" file that we exported from Wordpress when we were migrating our
+posts? That same file already has all our comments as well, we just need to
+import them into Disqus.
+Luckily that's pretty easy to do. You can go [here](http://import.disqus.com/)
+and directly upload your xml file. Disquss will take care of getting all your
+comments and adding them to your account for you to display them on your new
+blog.
+
+Two small caveats here that I didn't know at first and I lost some time figuring
+out:
+
+1. Since I didn't use a domain name with my Wordpress blog and comments are
+   associated with the
+   [permalink](http://www.bloggingbasics101.com/2008/11/what-is-a-permalink/) of
+   each post, comments on my new blog were not showing up because the domain
+   name was different. The way I solved this was to open the "wordpress.xml"
+   file and replace every occurrence of "jlordiales.wordpress.com" with
+   "jlordiales.github.io"
+
+2. Related to the previous issue is the way that Jekyll generates the permalinks
+   to be used by your posts. The default format is
+   "/:categories/:year/:month/:day/:title.html". In contrast, Wordpress default
+   permalink format is "/:year/:month/:day/:title". Luckily, Jekylls lets you
+   easily change this in your "\_config.yml" file adding a line with
+   {% highlight test %}
+    permalink: /:year/:month/:day/:title
+   {% endhighlight %}
+
+After taking care of this two things and importing my "wordpress.xml" file again
+into Disqus with the updated URLs, everything worked! I had my old comments on
+my posts!
