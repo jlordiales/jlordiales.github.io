@@ -346,10 +346,11 @@ your posts always have comments enabled. Very similar tests can be added for
 other attributes or to parse the `_config.yml` file to assert on the values of
 this file.
 
-# Conclusions To conclude this post I really recommend taking a look and GitHub
-Pages, Jekyll and its related tools. After a small initial setup you can be up
-an running in no time and even with free hosting on GitHub.  There are a lot of
-other things you can do, like using your own [custom
+# Conclusions 
+To conclude this post I really recommend taking a look and GitHub Pages, Jekyll
+and its related tools. After a small initial setup you can be up an running in
+no time and even with free hosting on GitHub.  There are a lot of other things
+you can do, like using your own [custom
 domain](https://help.github.com/articles/setting-up-a-custom-domain-with-github-pages/),
 [Continuous Integration](http://jekyllrb.com/docs/continuous-integration/) using
 [Travis](http://travis-ci.org), different [Jekyll
