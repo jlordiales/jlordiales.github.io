@@ -2,7 +2,7 @@
 author: jlordiales
 comments: true
 share: true
-date: 2014-10-26
+date: 2014-10-30
 layout: post
 title: Migrating from Wordpress to GitHub Pages
 categories:
@@ -29,23 +29,23 @@ repository you might have so you can pull, push and all the things you usually
 do. After doing that my new page was available at http://jlordiales.github.io
 
 Next step, clone your new repository and show a hello world page to make sure
-your new page is working properly. Then, I did:
+your new page is working properly:
 
 {% highlight bash %}
-cd ~
-git clone git@github.com:jlordiales/jlordiales.github.io.git
-cd jlordiales.github.io
-echo 'Hello World' > index.html
-git add .
-git commit -m "Initial commit"
-git push -u origin master
+$ cd ~
+$ git clone git@github.com:jlordiales/jlordiales.github.io.git
+$ cd jlordiales.github.io
+$ echo 'Hello World' > index.html
+$ git add .
+$ git commit -m "Initial commit"
+$ git push -u origin master
 {% endhighlight %}
 
 Went to my browser, typed http://jlordiales.github.io and boom, a lovely hello
 world page.
 Let's take a moment to reflect on what just happened. You created a regular git
 repository, you checked in an index.html file and your page was instantly
-updated and available to the whole world to see. All with just a "git push".
+updated and available to the whole world to see. All with just a `git push`.
 
 # A basic blog page
 Now that you have a basic hello world page hosted and working, what should you
@@ -59,18 +59,13 @@ bunch of others.
 
 Since I wanted to have my blog hosted and Jekyll's description says that "it  is
 a simple, blog-aware, static site generator", it seemed like that would be a
-good fit.
-I had never worked with Jekyll before so I went to their home page and saw the
-"Get up and running in seconds" snippet. Seemed easy enough. However, instead 
-of doing a 
+good fit.  I had never worked with Jekyll before so I went to their home page
+and saw the "Get up and running in seconds" snippet. Seemed easy enough.
+However, instead of doing a `gem install jekyll` I wanted to have a `Gemfile` with
+all my dependencies, so I created one in my repo folder with the following
+content:
 
-{% highlight bash %}
-gem install jekyll
-{% endhighlight %}
-
-I wanted to have a Gemfile with all my dependencies, so I created one in my repo
-folder with the following content:
-{% highlight bash %}
+{% highlight text %}
 source 'https://rubygems.org'
 
 gem 'jekyll'
@@ -78,8 +73,8 @@ gem 'jekyll'
 
 Followed by a quick 
 {% highlight bash %}
-bundle install
-jekyll new blog
+$ bundle install
+$ jekyll new blog
 {% endhighlight %}
 
 That generated a skeleton structure for a Jekyll blog. I wont't go into much
@@ -88,19 +83,19 @@ covers this pretty thoroughly. The thing that is worth noting is that after
 creating this base structure you can do a
 
 {% highlight bash %}
-jekyll serve
+$ jekyll serve --watch
 {% endhighlight %}
 
 And go to http://localhost:4000 to see your blog running locally. Furthermore
-you can start playing around modifying the Markdown files inside \_posts, save
+you can start playing around modifying the Markdown files inside `_posts`, save
 them, refresh your browser and automatically see the changes reflected there.
 Even more interesting is the fact that you can now push all these new files to
 github and see the live blog working in http;//#{your_user_name}.github.io
 
 What is happening under the hood is that when you push your code GitHub runs a
-"jekyll build" command on your repo. This command reads all your markdown files
+`jekyll build` command on your repo. This command reads all your markdown files
 in your folder, together with some HTML and configuration files and generates a
-\_site folder with static HTML that is served directly from GitHub.
+`_site` folder with static HTML that is served directly from GitHub.
 
 # Migrating my posts from Wordpress
 At this point you have a functional blog where you can just write markdown files
@@ -113,12 +108,13 @@ one.
 
 In my case, all my old stuff was in http://jlordiales.wordpress.com. The first
 thing I was sure I wanted were my posts. I saw that the Jekyll documentation had
-a Section on "Blog Migration". I decided to give that a shot, so I followed the
-installation instructions in http://import.jekyllrb.com/docs/installation/ and
-then when straight to the
-[Wordpress.com](http://import.jekyllrb.com/docs/wordpressdotcom/) section. 
-I saw that I first needed to export all my Wordpress data using their export
-tool so I did that and I got my wordpress.xml file with all my posts and metadata
+a Section on [Blog migration](http://jekyllrb.com/docs/migrations/). I decided
+to give that a shot, so I followed the installation
+[instructions](http://import.jekyllrb.com/docs/installation/) and then when
+straight to the
+[Wordpress.com](http://import.jekyllrb.com/docs/wordpressdotcom/) section.  I
+saw that I first needed to export all my Wordpress data using their export tool
+so I did that and I got my `wordpress.xml` file with all my posts and metadata
 (comments, tags, sections, etc.). With that file I run the Jekyll importer
 and... it didn't work.
 Well, it kind of worked:
@@ -133,7 +129,7 @@ Since that didn't work I looked again at the Jekyll documentation and saw that
 they recommend a couple of other approaches in case the Jekyll importer doesn't
 work. I decided to give [Exitwp](https://github.com/thomasf/exitwp) a shot. The
 setup was pretty straightforward following the project's README. I needed to
-have pyton installed and the same wordpress.xml file that I had exported before
+have pyton installed and the same `wordpress.xml` file that I had exported before
 from Wordpress. I ran the app and... it almost worked!
 Now all my posts were in Markdown format (including their tags and categories)
 except for my code lists. Definetely progress!
@@ -153,7 +149,7 @@ public class...
 {% endhighlight %}
 {% endraw %} {% endhighlight %}
 
-It turns out you can! Theres a _config.yaml_ file where you can specify custom
+It turns out you can! Theres a `config.yaml` file where you can specify custom
 replace regex that Exitwp will search for and apply for you while converting
 your posts. All I had to do was to define them as:
 
@@ -200,7 +196,7 @@ var disqus_shortname = ''; // required: replace example with your forum shortnam
 Where do you put that code? Well, Jekyll has the concept of
 [layout](http://jekyllrb.com/docs/structure/), which is basically a wrapper
 around your posts. The default post layout that you get with Jekyll when you do
-a _jekyll new blog_ looks like this:
+a `jekyll new blog` looks like this:
 
 {% highlight html %}
 
@@ -230,7 +226,7 @@ have comments enabled.
 Even though that works, if you start doing the same for other services
 (Analytics, Social media, etc.) your post layout starts to get cluttered with
 lot of unrelated stuff. What I did instead was to create a
-"disqus\_comments.html" file inside the \_includes directory created by Jekyll
+`disqus_comments.html` file inside the `_includes` directory created by Jekyll
 with the content I showed before.
 The html files in this directory are partials that can be included by your posts
 and layouts in order to facilitate reuse and, like in my case, to keep things
@@ -242,14 +238,14 @@ say:
 {% if page.comments %}{% include disqus_comments.html %}{% endif %}
 {% endraw %} {% endhighlight %}
 
-The "if page.comments" part allows you to decide on a post by post basis if you
-want to enable comments or not. You only need to say "comments: true" or
-"comments: false" on your [YAML front
+The `if page.comments` part allows you to decide on a post by post basis if you
+want to enable comments or not. You only need to say `comments: true` or
+`comments: false` on your [YAML front
 matter](http://jekyllrb.com/docs/frontmatter/)
 
 We now have Disqus comments integrated into our blogs but we still haven't
 migrated our old comments from Wordpress to Disqus. Remember that
-"wordpress.xml" file that we exported from Wordpress when we were migrating our
+`wordpress.xml` file that we exported from Wordpress when we were migrating our
 posts? That same file already has all our comments as well, we just need to
 import them into Disqus.
 Luckily that's pretty easy to do. You can go [here](http://import.disqus.com/)
@@ -264,19 +260,98 @@ out:
    associated with the
    [permalink](http://www.bloggingbasics101.com/2008/11/what-is-a-permalink/) of
    each post, comments on my new blog were not showing up because the domain
-   name was different. The way I solved this was to open the "wordpress.xml"
+   name was different. The way I solved this was to open the `wordpress.xml`
    file and replace every occurrence of "jlordiales.wordpress.com" with
    "jlordiales.github.io"
 
 2. Related to the previous issue is the way that Jekyll generates the permalinks
    to be used by your posts. The default format is
-   "/:categories/:year/:month/:day/:title.html". In contrast, Wordpress default
-   permalink format is "/:year/:month/:day/:title". Luckily, Jekylls lets you
-   easily change this in your "\_config.yml" file adding a line with
-   {% highlight test %}
+   `/:categories/:year/:month/:day/:title.html`. In contrast, Wordpress default
+   permalink format is `/:year/:month/:day/:title`. Luckily, Jekylls lets you
+   easily change this in your `_config.yml` file adding a line with
+   {% highlight text %}
     permalink: /:year/:month/:day/:title
    {% endhighlight %}
 
-After taking care of this two things and importing my "wordpress.xml" file again
+After taking care of this two things and importing my `wordpress.xml` file again
 into Disqus with the updated URLs, everything worked! I had my old comments on
 my posts!
+
+# Testing my blog
+So what do you have until now? You have a github repository with HTML, Markdown
+and YAML files. All these files are under version control and every time you
+push your changes you can see the result almost immediatly in your blog, hosted
+freely on GitHub Pages.
+That sounds a lot like a typical application you might work on a daily basis. In
+other words, a sort of "blog as code". Except for one thing: tests!
+
+What happens if I change the permalink format and push my changes? I loose all
+my comments. What if my markdown has a syntax error? Jekyll won't be able to
+compile it into HTML and my post will never make it live. If I don't set the
+author or date on my [YAML front
+matter](http://jekyllrb.com/docs/frontmatter/) then the posts will render with
+the wrong metadata.
+
+So how can we test this? We basically want to parse the different Markdown and
+YAML files and assert that a given group of attributes are present and set to
+the correct values. We can do this in a lot of different ways but given that
+Jekyll lives under the [Ruby](https://www.ruby-lang.org/en/) ecosystem a good
+option is to use ruby with [rspec](http://rspec.info/). As an added benefit,
+ruby has a pretty simple and easy to use YAML parse library.
+
+So where do we start? Adding rspec to our Gemfile, installing it and adding a
+spec folder on the root of our project (at the same level as `_posts`) with:
+
+{% highlight bash %}
+$ echo 'rspec' >> Gemfile
+$ bundle install
+$ mkdir spec
+{% endhighlight %}
+
+A simple test to parse the YAML Front matter and make sure that comments are
+enabled could look like this:
+
+{% highlight ruby %}
+require 'yaml'
+describe "Posts" do
+  let(:posts) {Dir["_posts/**/*.md"]}
+
+  it "should have comments enabled" do
+    posts.each {|post| has_comments_enabled?(post) }
+  end
+
+  def has_comments_enabled?(post_file)
+    expect(front_matter(post_file)["comments"]).to eq(true), 
+      "Post #{post_file} does not have comments enabled"
+  end
+
+  def front_matter(post_file)
+    content = File.read(post_file)
+    yaml_delimiter = "---"
+
+    front_matter = content[/#{yaml_delimiter}(.*?)#{yaml_delimiter}/m, 1]
+    YAML.load(front_matter)
+  end
+end
+{% endhighlight %}
+
+You can save this file as "spec/posts_spec.rb" for instance and then do a:
+
+{% highlight bash %}
+$ rspec
+{% endhighlight %}
+
+on the root folder to run it. Now you have an automatic way of making sure all
+your posts always have comments enabled. Very similar tests can be added for
+other attributes or to parse the `_config.yml` file to assert on the values of
+this file.
+
+# Conclusions To conclude this post I really recommend taking a look and GitHub
+Pages, Jekyll and its related tools. After a small initial setup you can be up
+an running in no time and even with free hosting on GitHub.  There are a lot of
+other things you can do, like using your own [custom
+domain](https://help.github.com/articles/setting-up-a-custom-domain-with-github-pages/),
+[Continuous Integration](http://jekyllrb.com/docs/continuous-integration/) using
+[Travis](http://travis-ci.org), different [Jekyll
+Themes](http://jekyllthemes.org/), add Google Analytics and a bunch of other
+stuff. All under proper version control and backed up by tests.
