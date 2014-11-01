@@ -14,7 +14,7 @@ tags:
 
 I recently migrated my blog from [Wordpress](http://jlordiales.wordpress.com/)
 to [GitHub Pages](https://pages.github.com/). Being the first post on this new
-plattform it seems fitting that I write about the migration experience.
+platform it seems fitting that I write about the migration experience.
 If you are not familiar with GitHub pages you can go to that previous link and
 it will give you a nice overview of what it is and what you can do with it. The
 short version? It's a free hosting for your site which is linked to your GitHub
@@ -77,7 +77,7 @@ $ bundle install
 $ jekyll new blog
 {% endhighlight %}
 
-That generated a skeleton structure for a Jekyll blog. I wont't go into much
+That generated a skeleton structure for a Jekyll blog. I won't go into much
 details about each folder and each file because the Jekyll documentation already
 covers this pretty thoroughly. The thing that is worth noting is that after
 creating this base structure you can do a
@@ -132,7 +132,7 @@ setup was pretty straightforward following the project's README. I needed to
 have pyton installed and the same `wordpress.xml` file that I had exported before
 from Wordpress. I ran the app and... it almost worked!
 Now all my posts were in Markdown format (including their tags and categories)
-except for my code lists. Definetely progress!
+except for my code lists. Definitely progress!
 Now, my source code snippets in Wordpress followed the format:
 
 {% highlight bash %}
@@ -249,7 +249,7 @@ migrated our old comments from Wordpress to Disqus. Remember that
 posts? That same file already has all our comments as well, we just need to
 import them into Disqus.
 Luckily that's pretty easy to do. You can go [here](http://import.disqus.com/)
-and directly upload your xml file. Disquss will take care of getting all your
+and directly upload your xml file. Disqus will take care of getting all your
 comments and adding them to your account for you to display them on your new
 blog.
 
@@ -267,7 +267,7 @@ out:
 2. Related to the previous issue is the way that Jekyll generates the permalinks
    to be used by your posts. The default format is
    `/:categories/:year/:month/:day/:title.html`. In contrast, Wordpress default
-   permalink format is `/:year/:month/:day/:title`. Luckily, Jekylls lets you
+   permalink format is `/:year/:month/:day/:title`. Luckily, Jekyll lets you
    easily change this in your `_config.yml` file adding a line with
    {% highlight text %}
     permalink: /:year/:month/:day/:title
@@ -280,7 +280,7 @@ my posts!
 # Testing my blog
 So what do you have until now? You have a github repository with HTML, Markdown
 and YAML files. All these files are under version control and every time you
-push your changes you can see the result almost immediatly in your blog, hosted
+push your changes you can see the result almost immediately in your blog, hosted
 freely on GitHub Pages.
 That sounds a lot like a typical application you might work on a daily basis. In
 other words, a sort of "blog as code". Except for one thing: tests!
