@@ -4,7 +4,7 @@ comments: true
 share: true
 date: 2014-11-01
 layout: post
-title: Functional style in Java, an overview
+title: An overview of functional style programming in Java 8
 categories:
 - Functional Programming
 - Java 8
@@ -52,10 +52,10 @@ expected in any functional language are:
 
 - Pure functions: functions with absolutely no side effects or that operate on
   immutable data. As we discussed before, this has several benefits. First,
-  since the data can not be changed (accidentally or not) this means that it can
-  be freely shared improving memory requirements and enabling parallelism.
-  Second, because the function will return the same result for invocations with
-  the same parameters (known as [referential
+  since the data can not be changed (accidentally or on purpose) this means that
+  it can be freely shared improving memory requirements and enabling
+  parallelism.  Second, because the function will return the same result for
+  invocations with the same parameters (known as [referential
   transparency](http://en.wikipedia.org/wiki/Referential_transparency_(computer_science)))
   the result can be easily cached and returned any number of times, improving
   performance. Finally, since the computation of functions are referentially
@@ -155,7 +155,8 @@ things much with respect to the anonymous class version we just saw. Instead, we
 can use the new concept of an anonymous method like this:
 
 {% highlight java %}
-File[] csvFiles = new File(".").listFiles(pathname -> pathname.getAbsolutePath().endsWith("csv"));
+File[] csvFiles = new File(".")
+                    .listFiles(pathname -> pathname.getAbsolutePath().endsWith("csv"));
 {% endhighlight %}
 
 This creates a method that takes a `pathname` parameter of type `File`
@@ -190,7 +191,7 @@ public enum Sex {
 }
 {% endhighlight %}
 
-Now imagine we want to filter a list of those users to get only the adults ones
+Now imagine we want to filter a list of those users to get only the adult ones
 (18 or older). We could do a typical for loop iteration like:
 
 {% highlight java %}
@@ -269,4 +270,159 @@ common operation. Do we really need to define a filter method that takes a
 Streams.
 
 ## Streams
+Almost every Java application needs to work with collections of elements. They
+need to create them, iterate through them, filter them, group their elements and
+so on. And yet, dealing with Java collections always seems cumbersome.
+Furthermore, you usually end up repeating the same boilerplate code like we saw
+on the last example.
+Let's look at another example of our `User` class to see how simple operations
+such as filtering and grouping can become a real pain to handle. Imagine we want
+to take our list of users and from there, we want to filter out all underage
+users and then group them by sex. We basically want a method that returns a
+`Map<Sex,List<User>>` so that then we can say something like `result.get(MALE)`
+and get back a list of all the male users of 18 or more. We could write
+something like the following:
 
+{% highlight java %}
+public Map<Sex, List<User>> groupUsers(List<User> allUsers) {
+  Map<Sex, List<User>> result = new HashMap<>();
+  for (User user : allUsers) {
+    if (user.getAge() >= 18) {
+      List<User> currentUsers = result.get(user.getSex());
+      if (currentUsers == null) {
+        currentUsers = new ArrayList<>();
+        result.put(user.getSex(),currentUsers);
+      }
+      currentUsers.add(user);
+    }
+  }
+  return result;
+}
+{% endhighlight %}
+
+You can see there's a lot of boilerplate to iterate through the list, to filter
+some users, to check whether we had a previous value on the map and so on. This
+makes the code harder to understand at first glance.
+
+With the Stream API introduced in Java 8 we can refactor the previous code to:
+
+{% highlight java %}
+public Map<Sex, List<User>> groupUsers(List<User> allUsers) {
+  return allUsers
+    .stream()
+    .filter(user -> user.getAge() >= 18)
+    .collect(groupingBy(User::getSex));
+}
+{% endhighlight %}
+
+We'll cover streams in more details in future posts. For now it is worth noting
+that even though Streams and Collections might seem similar (a sequence of
+elements) they are crucially different. With Collections you have to manage the
+iteration yourself, which is error prone and results in duplication of code.
+With Streams the iteration is managed internally by the library, you only to
+specify the behavior of what you are trying to do with it.
+
+Another big advantage of Streams over Collections is that they take advantage of
+parallelism without the need for the programmer to use convoluted and error
+prone synchronization mechanisms. In the previous example, if we know that the
+list of Users is potentially big we could split the stream to process it in
+parallel by doing one simple modification:
+
+{% highlight java %}
+public Map<Sex, List<User>> groupUsers(List<User> allUsers) {
+  return allUsers
+    .parallelStream()
+    .filter(user -> user.getAge() >= 18)
+    .collect(groupingBy(User::getSex));
+}
+{% endhighlight %}
+
+As always, if something seems to good to be true it usually is. So this "using
+parallelism" with a one liner change has its own restrictions and might not work
+as intended every time. We'll explore more of that on the next post.
+
+If you were looking closely at the examples you might have noticed that the
+`List` class has a `stream` and `parallelStream` methods that were not there
+before Java 8. Where are these methods declared? They are coming from
+`Collection`, an interface that `List` actually extends. But how did they add a
+new method to an interface that is being heavily used and implemented by classes
+outside of Java without breaking them? By implementing them on the `Collection`
+interface itself using a new feature introduced in Java 8, default methods.
+
+## Default methods
+Like I said before, the new default method feature allows you to actually
+implement a given method on the interface. Using the `stream` example from the
+`Collection` interface, its implementation looks like:
+
+{% highlight java %}
+default Stream<E> stream() {
+  return StreamSupport.stream(spliterator(), false);
+}
+{% endhighlight %}
+
+Notice the new `default` keyword on the method signature. Similarly, now the
+`List` interface has a sort method. So you don't need to do
+`Collections.sort(myList, myComparator)` anymore, you can simply do
+`myList.sort(myComparator)`. Again, the `sort` method was implemented as a
+default method on the `List` interface.
+
+This new feature is mainly there to help library providers to evolve their APIs
+more easily, adding methods they didn't originally think about without breaking
+existing clients. While this feature is certainly available to all Java users
+(not only APIs designers) you should use it with care, as you could end up
+making the code [harder to understand](http://goo.gl/vglwF1).
+
+Note that default methods introduce certain problems for the compiler as well.
+What happens if my interface `A` defines the default method `foo` and class `B`
+implements `A` and overrides `foo`? Which method gets invoked when I do a `new
+B().foo()`? Even more interesting, what if I also have a `C` interface with a
+default method `foo` and `B` implements both `A` and `C`? Which one gets called?
+There are two basic rules to decide which code gets executed in these
+situations:
+
+1. Classes always take priority over interfaces. If you have a default method in
+   an interface and you override that method in a class, then the method in the
+   class will always win
+
+2. If you have two interfaces and both define the same default method then you
+   have to explicitly tell Java which one it should use, otherwise you get a
+   compilation error. For example:
+{% highlight java %}
+public interface A {
+  default void foo() {
+    System.out.println("A");
+  }
+}
+
+public interface B {
+  default void foo() {
+    System.out.println("B");
+  }
+}
+
+public class C implements A,B {
+  public void foo() {
+    B.super.foo();
+  }
+}
+{% endhighlight %}
+
+## Conclusions
+Since the release of Java 1.0 in 1996, the language has been evolving gradually
+over the years to accommodate the new technologies and practices of the
+industry. Some would say that the changes introduced in Java 8 are in some ways
+more profound that any other change introduced on Java's history. These changes
+do not only move Java to a more functional style but also aim to provide
+developers with the capabilities to make better use of concurrency, a crucial
+aspect in times where the data that needs to be processed becomes larger and
+larger.
+
+It should be clear though, the fact that Java now has **some** of the features
+that are available and largely used in functional languages doesn't
+automatically make it a functional language as well. Java is still at its core
+an Object Oriented, imperative programming language and will continue to be so.
+As with most things in technology, these new features are merely tools that you
+can add to your toolbox. It's your job to understand them and knowing when it
+makes sense to use them and, more importantly, when it doesn't.
+
+Cheers!
