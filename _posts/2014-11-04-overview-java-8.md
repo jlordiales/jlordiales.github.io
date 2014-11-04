@@ -104,7 +104,7 @@ as parameters to other functions? In Java the concept of function is associated
 with a method. Traditionally you could define methods inside classes and then
 pass those classes to other methods but you could not pass the method itself.
 Let see this with an example. Let's say you want to list all directories under
-the current path. You could do something like this;
+the current path. You could do something like this:
 
 {% highlight java %}
 File[] directories = new File(".").listFiles(new FileFilter() {
