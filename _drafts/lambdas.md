@@ -102,7 +102,200 @@ interface that it is intended to be a functional interface and that they can use
 lambdas and method references wherever they are expected. Second, it works as a 
 compile-time check to make sure that the interface is indeed functional. If you
 add this annotation to your interface and it is not in fact functional then you
-will get a nice compile error leting you know this. It is worth noting that the
+will get a nice compile error letting you know this. It is worth noting that the
 annotation is not actually required but it is usually a good idea to have it
 there for the reasons I mentioned before.
 
+# Some useful functional interfaces
+Now that we know what a functional interface is and how it can be used, lets
+look at some pretty useful interfaces provided by Java in its
+`java.function.util` package
+
+## Predicate
+The predicate interface defines a simple `test` method that takes an object and
+returns a boolean. It looks something like:
+
+{% highlight java %}
+@FunctionalInterface
+public interface Predicate<T> {
+    boolean test(T t);
+}
+{% endhighlight %}
+
+This is pretty useful for things like filtering. You could have a generic method
+to filter a list:
+
+{% highlight java %}
+public static <T> List<T> filter(List<T> list, Predicate<T> predicate) {
+  List<T> result = new ArrayList<>();
+  for (T elem : list) {
+    if (predicate.test(elem)) {
+      result.add(elem);
+    }
+  }
+  return result;
+}
+{% endhighlight %}
+
+And then create a predicate for your particular object. For example, a predicate
+that given a `User` returns true if his age is greater than or equal to 18:
+
+{% highlight java %}
+public enum Sex {
+  MALE, FEMALE
+}
+
+public class User {
+  private final int age;
+  private final String name;
+  private final Sex sex;
+
+  public User(int age, String name, Sex sex) {
+    this.age = age;
+    this.name = name;
+    this.sex = sex;
+  }
+
+  public int getAge() {
+    return age;
+  }
+
+  public boolean isMale() {
+    return MALE.equals(sex);
+  }
+}
+
+Predicate<User> predicate = user -> user.getAge() >= 18;
+{% endhighlight %}
+
+A pretty useful functionality about predicates is that they can be composed
+together to form more complex ones. For instance, what do you do if suddenly you
+want a new `User` predicate that returns true for all users who are less than
+18? Do you create a new predicate like the previous one but changing the `>=` by
+`<`? Luckily, you don't have to because the `Predicate` interface provides 3
+methods to compose several predicates: `and`, `or` and `negate`. So the previous
+example could be written as:
+
+{% highlight java %}
+Predicate<User> older = user -> user.getAge() >= 18;
+Predicate<User> younger = older.negate();
+{% endhighlight %}
+
+Similarly, if we want a predicate that returns true for all the male users older
+or equal to 18, we could write it as:
+
+{% highlight java %}
+Predicate<User> older = user -> user.getAge() >= 18;
+Predicate<User> adultMales = older.and(User::isMale);
+{% endhighlight %}
+
+That last example shows that we can use method references where a `Predicate` is
+expected. In fact, we can use a method reference wherever a functional interface
+is expected. We quickly saw method references in the [previous post]({%
+post_url 2014-11-01-overview-java-8 %}) but we'll discuss more about them later
+on.
+
+## Function
+The java.util.function.Function interface is defined as:
+
+{% highlight java %}
+@FunctionalInterface
+public interface Function<T, R> {
+  R apply(T t);
+}
+{% endhighlight %}
+
+What this basically does is take an input of type `T` and transform it somehow
+to return an object of type `R`. Note that the `Predicate` interface can be seen
+as a special case of a `Function` where `R` is always a boolean value. Following
+our `User` examples, imagine we want a function that given an `User` instance it
+returns that user's name length instance it returns that user's name length. We
+could write this function like this:
+
+{% highlight java %}
+Function<User,Integer> nameLength = user -> user.getName().length();
+{% endhighlight %}
+
+Like predicates, the `Function` interface also has some useful methods to
+compose several functions. The two methods offered are `compose` and `andThen`.
+The difference between them is subtle but important. To understand this better,
+imagine we have the following 2 functions:
+
+{% highlight java %}
+Function<Integer,Integer> sumOne = number -> number + 1;
+Function<Integer,Integer> duplicate = number -> number * 2;
+{% endhighlight %}
+
+We can then create 2 new functions in the following way:
+
+{% highlight java %}
+Function<Integer, Integer> composed = sumOne.compose(duplicate);
+Function<Integer, Integer> andThen = sumOne.andThen(duplicate);
+
+System.out.println(composed.apply(2));
+System.out.println(andThen.apply(2));
+{% endhighlight %}
+
+The `composed` function will first apply `duplicate` and then apply `sumOne` on
+the result. In other words, composing `sumOne` with `duplicate` will result in
+`sumOne(duplicate(x))` and the first System.out will print 5. The `andThen`
+function will do exactly the opposite, it will first apply `sumOne` and then
+apply `duplicate` on the result. In this case the second System.out will print
+6.
+
+## Consumer
+The java.util.function.Consumer interface defines an `accept` method that takes
+a paramter of type `T` and returns no value. In other words:
+
+{% highlight java%}
+@FunctionalInterface
+public interface Consumer<T> {
+    void accept(T t);
+}
+{% endhighlight %}
+
+This interface is useful when you want to access an element and perform some
+operation on it. For instance, starting with Java 8, lists have a `forEach`
+method where you can pass a `Consumer<T>` and this function will be applied to
+each element on the list. 
+
+So imagine that you want to print to `System.out` each element on a list. You
+could do that in the following way:
+
+{% highlight java %}
+List<String> users = Arrays.asList("java","8","rocks");
+users.forEach(elem -> System.out.println(elem));
+{% endhighlight %}
+
+The implementation of the `forEach` method is actually quite straightforward:
+
+{% highlight java %}
+void forEach(Consumer<? super T> action) {
+  for (T t : this) {
+    action.accept(t);
+  }
+}
+{% endhighlight %}
+
+# Method references
+Lambda expressions are undoubtedly a great construct to make your code more
+compact. However, some times all you do in your lambda is to call an individual
+method potentially passing some parameter to it. In these cases you can often
+replace your lambda expression by a method reference. 
+
+Method references are compact ways to create lambda expressions for methods that
+already have a name. For instance, in the previous section we saw an example of
+the `forEach` method:
+
+{% highlight java %}
+List<String> users = Arrays.asList("java","8","rocks");
+users.forEach(elem -> System.out.println(elem));
+{% endhighlight %}
+
+Here, our lambda expression is only calling the `System.out.println` method.
+Therefore, we could rewrite it like this:
+
+{% highlight java %}
+List<String> users = Arrays.asList("java","8","rocks");
+users.forEach(System.out::println);
+{% endhighlight %}
