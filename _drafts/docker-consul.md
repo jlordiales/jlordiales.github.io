@@ -4,7 +4,7 @@ comments: true
 share: true
 date: 2015-01-20
 layout: post
-title: Discovering your Docker containers
+title: Where are my containers? Dockerized service discovery
 categories:
 - Devops
 - Microservices
@@ -28,7 +28,8 @@ Consul running as a container to achieve this goal in a robust and scalable way.
 
 # Consul
 Consul came out of [Hashicorp](https://hashicorp.com/), the same company behind
-popular tools like Vagrant and Packer. They are pretty good at creating Devops
+popular tools like [Vagrant](https://www.vagrantup.com/) and
+[Packer](https://www.packer.io/). They are pretty good at creating Devops
 friendly tools so I take some time to play around with anything they come up
 with. Consul has several components that provide different functionalities but
 in a nutshell is a highly distributed and highly available tool for service
@@ -88,7 +89,7 @@ $ docker run -p 8400:8400 -p 8500:8500 -p 8600:53/udp \
 You should see something like:
 
 {% highlight text %}
-==> WARNING: Bootstrap mode enabled! Do not enable unless necessary
+==> WARNING: bootstrap mode enabled! do not enable unless necessary
 ==> WARNING: It is highly recommended to set GOMAXPROCS higher than 1
 ==> Starting Consul agent...
 ==> Starting Consul agent RPC...
@@ -121,9 +122,10 @@ You should see something like:
 
 The `-server -bootstrap` tells Consul to start this agent in server mode and not
 wait for any other instances to join. Notice how Consul actually warns you about
-this when you start the server.
+this when you start the server: __bootstrap mode enabled! do not enable unless
+necessary__.
 
-We can now query Consul through its REST API, Since I'm running
+We can now query Consul through its REST API. Since I'm running
 [boot2docker](http://boot2docker.io/) I need to get the VM IP first:
 
 {% highlight bash %}
@@ -139,7 +141,11 @@ http://192.168.59.103:8500/ (replace the IP by whatever your Docker host IP is)
 in your browser to see a nice UI with information about the currently registered
 services and nodes.
 
-Lets now add a new service. We'll start by adding an external service, following
+Lets now add a new service. We usually want to register all the services that
+are under our control. But what about the external ones? It is seldom the case
+where we don't use any third party services. It would certainly be nice to treat
+both types equally from a service discovery point of view.
+We'll start by adding an external service, following
 the example given in the documentation:
 
 {% highlight bash %}
@@ -148,9 +154,18 @@ $ curl -X PUT -d \
 http://$DOCKER_IP:8500/v1/catalog/register
 {% endhighlight %}
 
-Here we registered the "google" node as offering the "search" service.  We can
-now query Consul through its HTTP API to see all the services that are currently
-registered with it:
+Here we registered the "google" node as offering the "search" service. But what
+if google is down for some reason? (can that happen?). We can register multiple
+search services:
+
+{% highlight bash %}
+$ curl -X PUT -d \
+'{"Datacenter": "dc1", "Node": "bing", "Address": "www.bing.com", "Service": {"Service": "search", "Port": 80}}' \
+http://$DOCKER_IP:8500/v1/catalog/register
+{% endhighlight %}
+
+We can now query Consul through its HTTP API to see all the services that are
+currently registered with it:
 
 {% highlight bash %}
 $ curl $DOCKER_IP:8500/v1/catalog/services
@@ -158,32 +173,46 @@ $ curl $DOCKER_IP:8500/v1/catalog/services
 {"consul":[],"search":[]}
 {% endhighlight %}
 
-We can see that the "search" service that we added before is registered. We can
-also use the DNS interface to query for services:
+We can see that the "search" service that we added before is registered. Note
+that we don't see any mention about the 2 specific services we added. If we want
+to get more information about any particular service we can also do that:
 
 {% highlight bash %}
-$ dig @$DOCKER_IP -p 8600 search.service.consul.
+$ curl $DOCKER_IP:8500/v1/catalog/service/search
+
+[
+  {"Node":"google","Address":"www.google.com","ServiceID":"search","ServiceName":"search","ServiceTags":null,"ServicePort":80},
+  {"Node":"bing","Address":"www.bing.com","ServiceID":"search","ServiceName":"search","ServiceTags":null,"ServicePort":80}
+]
+{% endhighlight %}
+
+We can also use the DNS interface to query for services:
+
+{% highlight bash %}
+dig @$DOCKER_IP -p 8600 search.service.consul.
 
 ; <<>> DiG 9.8.3-P1 <<>> @192.168.59.103 -p 8600 search.service.consul.
 ; (1 server found)
 ;; global options: +cmd
 ;; Got answer:
-;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 29403
-;; flags: qr aa rd ra; QUERY: 1, ANSWER: 4, AUTHORITY: 0, ADDITIONAL: 0
+;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 1330
+;; flags: qr aa rd ra; QUERY: 1, ANSWER: 6, AUTHORITY: 0, ADDITIONAL: 0
 
 ;; QUESTION SECTION:
 ;search.service.consul.         IN      A
 
 ;; ANSWER SECTION:
 search.service.consul.  0       IN      CNAME   www.google.com.
-www.google.com.         77      IN      A       64.233.186.147
-www.google.com.         77      IN      A       64.233.186.105
-www.google.com.         77      IN      A       64.233.186.104
+www.google.com.         255     IN      A       173.194.42.243
+www.google.com.         255     IN      A       173.194.42.242
+www.google.com.         255     IN      A       173.194.42.241
+search.service.consul.  0       IN      CNAME   www.bing.com.
+any.edge.bing.com.      375     IN      A       204.79.197.200
 
-;; Query time: 35 msec
+;; Query time: 133 msec
 ;; SERVER: 192.168.59.103#8600(192.168.59.103)
-;; WHEN: Wed Dec 10 18:13:53 2014
-;; MSG SIZE  rcvd: 178
+;; WHEN: Thu Jan 22 17:43:28 2015
+;; MSG SIZE  rcvd: 258
 {% endhighlight %}
 
 ## Running a Consul cluster
@@ -212,10 +241,11 @@ $ docker run --name node1 -h node1 progrium/consul -server -bootstrap-expect 3
 Note here that instead of passing the `-bootstrap` flag we are passing a
 `-bootstrap-expect 3` flag, which tells Consul that it should wait until 3
 servers join to actually start the cluster.
-In order to join the 2 remaining nodes, we will need the IP of the first one
-(the only node we know of so far). We can get this IP using `docker inspect` and
-looking for the `IPAddress` field. Or you can just export that to an environment
-variable with:
+In order to join the cluster a node only needs to know the location of 1 node
+that is already part of it. So to join the second node we will need the IP of
+the first one (the only node we know of so far). We can get this IP using
+`docker inspect` and looking for the `IPAddress` field. Or you can just export
+that to an environment variable with:
 
 {% highlight bash %}
 {% raw  %}
@@ -273,6 +303,8 @@ $ docker run -d -p 8400:8400 -p 8500:8500 -p 8600:53/udp \
 --name node4 -h node4 progrium/consul -join $JOIN_IP
 {% endhighlight %}
 
+Note that we didn't pass the `-server` parameter this time and we added the port
+mapping information.
 We can now interact with the cluster through our client node. We could, for
 instance, use the REST API to see all the nodes that are currently part of the
 cluster:
@@ -397,5 +429,26 @@ that the one we used on the PUT) and we would get exactly the same answer from
 Consul.
 
 ## Conclusion
-In the [previous post]({% post_url 2014-12-07-aws-docker %}) I talked a bit
+In the [last post]({% post_url 2014-12-07-aws-docker %}) we saw an overview of
+Docker and its benefits. This is really easy to see when you consider a service
+running on a single container. But when you start to throw in hundreds or
+thousands of containers things start to get a bit more complicated. One of the
+first things you need is to know where each container lives and what services it
+offers. You also need some basic form of health-check to be sure that you don't
+try to send requests to containers that are either not able to reply or 
+are not there anymore.
+Consul, a highly scalable and efficient service discovery tool, solves these
+problems in a very elegant way. Of course, there are many other alternatives out
+there with different capabilities like [etcd](https://github.com/coreos/etcd) or
+[SkyDns](https://github.com/skynetservices/skydns/). I haven't had a chance to
+play around with those yet so I don't have an informed opinion about them.
+
+One thing that we haven't talked about yet is how would you go about registering
+your containers. By this I don't mean the Consul-specific way of registering
+services but rather a more general question: who is responsible for doing this?
+Should the container know how to register itself with the cluster? Should the
+operator running the container do this? Someone else? All these approaches have
+pros and cons. In the next post I'll discuss these options as well as showing a
+really amazing tool from Jeff Lindsay that makes it incredibly easy and
+transparent to deal with container registration.
 
