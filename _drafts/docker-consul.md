@@ -76,6 +76,7 @@ I would strongly suggest taking a look at its
 [documentation](https://www.consul.io/docs/index.html) to get a more detailed
 explanation of how all of this works.
 
+# Running a single node cluster
 And now, the fun part! Lets see how we can bootstrap a Consul cluster using
 Docker containers. We'll first run a Consul cluster consisting of a single
 server to see how it works. We'll use the amazing image built by
@@ -215,7 +216,7 @@ any.edge.bing.com.      375     IN      A       204.79.197.200
 ;; MSG SIZE  rcvd: 258
 {% endhighlight %}
 
-## Running a Consul cluster
+# Running a Consul cluster
 Ok, so we were able to run a single Consul agent in server mode and register an
 external service. But, as I mentioned before, this is usually a very bad idea
 for availability reasons. So lets see how we could run a cluster with 3 servers,
@@ -350,7 +351,9 @@ This combined with the fact that we can have thousands of clients in the cluster
 without any performance impact makes Consul an extremely highly available
 service discovery solution.
 
-## Key/Value store
+[how we would run a cluster in production]
+
+# Key/Value store
 In addition to its service discovery and health check capabilities, Consul
 offers a key/value store for whatever you may need. We can easily access it
 through its REST API. We'll keep using the 5 node cluster we got running before.
@@ -428,7 +431,7 @@ $DOCKER_IP:8501/v1/kv/key1` (changing the port to 8501 to query a different node
 that the one we used on the PUT) and we would get exactly the same answer from
 Consul.
 
-## Conclusion
+# Conclusion
 In the [last post]({% post_url 2014-12-07-aws-docker %}) we saw an overview of
 Docker and its benefits. This is really easy to see when you consider a service
 running on a single container. But when you start to throw in hundreds or
