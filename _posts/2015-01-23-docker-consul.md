@@ -2,11 +2,11 @@
 author: jlordiales
 comments: true
 share: true
-date: 2015-01-20
+date: 2015-01-23
 layout: post
 title: Where are my containers? Dockerized service discovery
 categories:
-- Devops
+- DevOps
 - Microservices
 tags:
 - Docker
@@ -29,7 +29,7 @@ Consul running as a container to achieve this goal in a robust and scalable way.
 # Consul
 Consul came out of [Hashicorp](https://hashicorp.com/), the same company behind
 popular tools like [Vagrant](https://www.vagrantup.com/) and
-[Packer](https://www.packer.io/). They are pretty good at creating Devops
+[Packer](https://www.packer.io/). They are pretty good at creating DevOps
 friendly tools so I take some time to play around with anything they come up
 with. Consul has several components that provide different functionalities but
 in a nutshell is a highly distributed and highly available tool for service
@@ -350,8 +350,6 @@ $ curl $DOCKER_IP:8501/v1/catalog/nodes
 This combined with the fact that we can have thousands of clients in the cluster
 without any performance impact makes Consul an extremely highly available
 service discovery solution.
-
-[how we would run a cluster in production]
 
 # Key/Value store
 In addition to its service discovery and health check capabilities, Consul
