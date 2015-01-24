@@ -4,7 +4,7 @@ comments: true
 share: true
 date: 2015-01-23
 layout: post
-title: Where are my containers? Dockerized service discovery
+title: Where are my containers? Dockerized service discovery with Consul
 categories:
 - DevOps
 - Microservices
