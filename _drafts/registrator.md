@@ -2,9 +2,9 @@
 author: jlordiales
 comments: true
 share: true
-date: 2014-12-08
+date: 2015-02-03
 layout: post
-title: Running Docker in AWS with Elastic Beanstalk
+title: Automatic container registration with Consul and Registrator
 categories:
 - Devops
 - Microservices
@@ -12,295 +12,40 @@ tags:
 - Docker
 - Consul
 - Registrator
-- ConsulTemplate
 ---
-In the [previous post]({% post_url 2014-12-07-aws-docker %}) I talked a bit
-about Docker and the main benefits you can get from running your applications as
-isolated, loosely coupled containers. We then saw how to "dockerize" a small
-python web service and how to run this container in AWS, first manually and then
-using Elastic Beanstalk to quickly deploy changes to it. This was really good
-from an introduction to Docker point of view but in real life one single
-container running on a host will not cut it.
-You will need a set of related containers running together and collaborating,
-each with the ability to be deployed independently. This also means that you
-need a way to know which container is running what and where. You probably
-also want to have some redundancy given how easy it is to run multiple
-containers from the same Docker image, aiming for some load balancing among
-them.
-In this post I wanted to talk a bit about some tools to achieve all of that in
-an easy and transparent way. We'll take a look at [Consul](https://consul.io/), 
-[Consul Template](https://hashicorp.com/blog/introducing-consul-template.html) and
-[Registrator](https://github.com/progrium/registrator) and how to use them effectively together.
+In the previous post we talked about Consul and how it can help us towards a 
+highly available and efficient service discovery. We saw how to run a Consul
+cluster, register services, query through its HTTP API as well as its DNS
+interface and use the distributed key/value store. 
+One thing we missed though was how to register the different services we run as
+docker containers with the Cluster. In this post I'm going to talk about
+[Registrator](https://github.com/progrium/registrator), an amazing tool that we
+can run as a docker container whose responsibility is to make sure that new
+containers are registered and deregistered automatically from our service
+discovery tool.
 
-# Consul
-Consul came out of [Hashicorp](https://hashicorp.com/), the same company behind
-popular tools like Vagrant and Packer. They are pretty good at creating Devops
-friendly tools so I take some time to play around with anything they come up
-with. Consul has several components that provide different functionalities but
-in a nutshell is a highly distributed and highly available tool for service
-discovery. Clients can register new services with Consul, specifying a name and
-additional information in the form of tags and then query Consul for services
-that match their criteria using either HTTP or DNS. We'll see an example later
-on.
-
-In addition to clients specifying the services they want to register they can
-also specify any number of health checks. The health check can be made against
-your application (e.g., the REST endpoint is listening to connections on port X)
-or on the physical node itself (e.g., the CPU utilization is above 90%). Consul
-will use these health checks to know which nodes it should exclude when a client
-queries for a specific service.
-
-Finally, Consul also provides a highly scalable and fault tolerant Key/Value
-store, which your services can use for anything they want: dynamic
-configuration, feature flags, etc.
-
-So how does it work? The main thing you need is a Consul agent running as a
-server. This Consul server is responsible for storing data and replicating it to
-other servers. You can have a fully functioning Consul system with just 1 server
-but that is usually a bad idea for a production deployment. Your server becomes
-your [single point of
-failure](http://en.wikipedia.org/wiki/Single_point_of_failure) and you can not
-discover your services if that server goes down. The Consul documentation
-recommends setting up a cluster with 3 or 5 Consul servers running to avoid data
-loss. More than that and the communication starts to suffer from progressively
-increasing overhead. In addition to running as a server, an agent can also run
-in client mode. These agents have a lot less responsibilities than servers and
-are pretty much stateless components. 
-Usually, nodes wanting to register services running on them with Consul do so by
-registering them with their local running Consul agent. However, you can also
-register [external services](http://www.consul.io/docs/guides/external.html) so
-you don't need to run a Consul agent on every node that is hosting your
-services.
-
-Queries can be made against any type of Consul
-agent, either running as a server or a client. Unlike servers, you can have
-thousands or tens of of thousands of Consul clients without any significant
-impact on performance or network overhead.  
-I would strongly suggest taking a look at its
-[documentation](https://www.consul.io/docs/index.html) to get a more detailed
-explanation of how all of this works.
-
-And now, the fun part! Lets see how we can bootstrap a Consul cluster using
-Docker containers. We'll first run a Consul cluster consisting of a single
-server to see how it works. We can do this with:
-
-{% highlight bash %}
-$ docker run -p 8400:8400 -p 8500:8500 -p 8600:53/udp -h node1 progrium/consul
--server -bootstrap
-{% endhighlight %}
-
-You should see something like:
-
-{% highlight text %}
-==> WARNING: Bootstrap mode enabled! Do not enable unless necessary
-==> WARNING: It is highly recommended to set GOMAXPROCS higher than 1
-==> Starting Consul agent...
-==> Starting Consul agent RPC...
-==> Consul agent running!
-         Node name: 'node1'
-        Datacenter: 'dc1'
-            Server: true (bootstrap: true)
-       Client Addr: 0.0.0.0 (HTTP: 8500, DNS: 53, RPC: 8400)
-      Cluster Addr: 172.17.0.66 (LAN: 8301, WAN: 8302)
-    Gossip encrypt: false, RPC-TLS: false, TLS-Incoming: false
-
-==> Log data will now stream in as it occurs:
-
-    2014/12/04 19:33:30 [INFO] serf: EventMemberJoin: node1 172.17.0.66
-    2014/12/04 19:33:30 [INFO] serf: EventMemberJoin: node1.dc1 172.17.0.66
-    2014/12/04 19:33:30 [INFO] raft: Node at 172.17.0.66:8300 [Follower] entering Follower state
-    2014/12/04 19:33:30 [INFO] consul: adding server node1 (Addr: 172.17.0.66:8300) (DC: dc1)
-    2014/12/04 19:33:30 [INFO] consul: adding server node1.dc1 (Addr: 172.17.0.66:8300) (DC: dc1)
-    2014/12/04 19:33:30 [ERR] agent: failed to sync remote state: No cluster leader
-    2014/12/04 19:33:31 [WARN] raft: Heartbeat timeout reached, starting election
-    2014/12/04 19:33:31 [INFO] raft: Node at 172.17.0.66:8300 [Candidate] entering Candidate state
-    2014/12/04 19:33:31 [INFO] raft: Election won. Tally: 1
-    2014/12/04 19:33:31 [INFO] raft: Node at 172.17.0.66:8300 [Leader] entering Leader state
-    2014/12/04 19:33:31 [INFO] consul: cluster leadership acquired
-    2014/12/04 19:33:31 [INFO] consul: New leader elected: node1
-    2014/12/04 19:33:31 [INFO] raft: Disabling EnableSingleNode (bootstrap)
-    2014/12/04 19:33:31 [INFO] consul: member 'node1' joined, marking health alive
-    2014/12/04 19:33:33 [INFO] agent: Synced service 'consul'
-{% endhighlight %}
-
-The `-server -bootstrap` tells Consul to start this agent in server mode and not
-wait for any other instances to join. Notice how Consul actually warns you about
-this when you start the server.
-
-We can now query Consul through its REST API, Since I'm running boot2docker I need to
-get the VM IP first:
-
-{% highlight bash %}
-$ export DOCKER_IP=$(boot2docker ip)
-$ curl $DOCKER_IP:8500/v1/catalog/nodes
-
-[{"Node":"node1","Address":"172.17.0.66"}]
-{% endhighlight %}
-
-You get a JSON response specifying the nodes that are currently part of the
-Consul cluster, which in our case so far is just one. You can also go to
-http://192.168.59.103:8500/ (replace the IP by whatever your Docker host IP is)
-in your browser to see a nice UI with information about the currently registered
-services and nodes.
-
-Lets now add a new service. We'll start by adding an external service, following
-the example given in the documentation:
-
-{% highlight bash %}
-$ curl -X PUT -d '{"Datacenter": "dc1", "Node": "google", "Address": "www.google.com", "Service": {"Service": "search", "Port": 80}}' http://$DOCKER_IP:8500/v1/catalog/register
-{% endhighlight %}
-
-Here we registered the "google" node as offering the "search" service.  We can
-now query Consul through its HTTP API to see all the services that are currently
-registered with it:
-
-{% highlight bash %}
-$ curl $DOCKER_IP:8500/v1/catalog/services
-
-{"consul":[],"search":[]}
-{% endhighlight %}
-
-We can see that the "search" service that we added before is registered. We can
-also use the DNS interface to query for services:
-
-{% highlight bash %}
-$ dig @$DOCKER_IP -p 8600 search.service.consul.
-
-; <<>> DiG 9.8.3-P1 <<>> @192.168.59.103 -p 8600 search.service.consul.
-; (1 server found)
-;; global options: +cmd
-;; Got answer:
-;; ->>HEADER<<- opcode: QUERY, status: NOERROR, id: 29403
-;; flags: qr aa rd ra; QUERY: 1, ANSWER: 4, AUTHORITY: 0, ADDITIONAL: 0
-
-;; QUESTION SECTION:
-;search.service.consul.         IN      A
-
-;; ANSWER SECTION:
-search.service.consul.  0       IN      CNAME   www.google.com.
-www.google.com.         77      IN      A       64.233.186.147
-www.google.com.         77      IN      A       64.233.186.105
-www.google.com.         77      IN      A       64.233.186.104
-
-;; Query time: 35 msec
-;; SERVER: 192.168.59.103#8600(192.168.59.103)
-;; WHEN: Wed Dec 10 18:13:53 2014
-;; MSG SIZE  rcvd: 178
-{% endhighlight %}
-
-## Running a Consul cluster
-Ok, so we were able to run a single Consul agent in server mode and register an
-external service. But, as I mentioned before, this is usually a very bad idea
-for availability reasons. So lets see how we could run a cluster with 3 servers,
-all of them running locally on different Docker containers.
-
-We'll start the first node similarly to the way we did it before:
-{% highlight bash %}
-$ docker run --name node1 -h node1 progrium/consul -server -bootstrap-expect 3
-
-==> WARNING: Expect Mode enabled, expecting 3 servers
-==> WARNING: It is highly recommended to set GOMAXPROCS higher than 1
-==> Starting Consul agent...
-==> Starting Consul agent RPC...
-==> Consul agent running!
-         Node name: 'node1'
-        Datacenter: 'dc1'
-            Server: true (bootstrap: false)
-       Client Addr: 0.0.0.0 (HTTP: 8500, DNS: 53, RPC: 8400)
-      Cluster Addr: 172.17.0.75 (LAN: 8301, WAN: 8302)
-    Gossip encrypt: false, RPC-TLS: false, TLS-Incoming: false
-{% endhighlight %}
-
-Note here that instead of passing the `-bootstrap` flag we are passing a
-`-bootstrap-expect 3` flag, which tells Consul that it should wait until 3
-servers join to actually start the cluster.
-In order to join the 2 remaining nodes, we will need the IP of the first one
-(the only node we know of so far). We can get this IP using `docker inspect` and
-looking for the `IPAddress` field. Or you can just export that to an environment
-variable with:
-
-{% highlight bash %}
-$ JOIN_IP="$(docker inspect -f '{{.NetworkSettings.IPAddress}}' node1)"
-{% endhighlight %}
-
-We can now start our 2 remaining servers and join them with the first one:
-
-{% highlight bash %}
-$ docker run -d --name node2 -h node2 progrium/consul -server -join $JOIN_IP
-$ docker run -d --name node3 -h node3 progrium/consul -server -join $JOIN_IP
-{% endhighlight %}
-
-After doing that you should see something like this on the `node1` logs:
-
-{% highlight bash %}
-2014/12/06 08:15:54 [INFO] serf: EventMemberJoin: node2 172.17.0.76
-2014/12/06 08:15:54 [INFO] consul: adding server node2 (Addr: 172.17.0.76:8300) (DC: dc1)
-2014/12/06 08:15:58 [ERR] agent: failed to sync remote state: No cluster leader
-2014/12/06 08:16:15 [INFO] serf: EventMemberJoin: node3 172.17.0.77
-2014/12/06 08:16:15 [INFO] consul: adding server node3 (Addr: 172.17.0.77:8300) (DC: dc1)
-2014/12/06 08:16:15 [INFO] consul: Attempting bootstrap with nodes: [172.17.0.75:8300 172.17.0.76:8300 172.17.0.77:8300]
-2014/12/06 08:16:16 [WARN] raft: Heartbeat timeout reached, starting election
-2014/12/06 08:16:16 [INFO] raft: Node at 172.17.0.75:8300 [Candidate] entering Candidate state
-2014/12/06 08:16:16 [WARN] raft: Remote peer 172.17.0.77:8300 does not have local node 172.17.0.75:8300 as a peer
-2014/12/06 08:16:16 [INFO] raft: Election won. Tally: 2
-2014/12/06 08:16:16 [INFO] raft: Node at 172.17.0.75:8300 [Leader] entering Leader state
-2014/12/06 08:16:16 [INFO] consul: cluster leadership acquired
-2014/12/06 08:16:16 [INFO] raft: pipelining replication to peer 172.17.0.77:8300
-2014/12/06 08:16:16 [INFO] consul: New leader elected: node1
-2014/12/06 08:16:16 [WARN] raft: Remote peer 172.17.0.76:8300 does not have local node 172.17.0.75:8300 as a peer
-2014/12/06 08:16:16 [INFO] raft: pipelining replication to peer 172.17.0.76:8300
-2014/12/06 08:16:16 [INFO] consul: member 'node3' joined, marking health alive
-2014/12/06 08:16:16 [INFO] consul: member 'node1' joined, marking health alive
-2014/12/06 08:16:16 [INFO] consul: member 'node2' joined, marking health alive
-2014/12/06 08:16:18 [INFO] agent: Synced service 'consul'
-{% endhighlight %}
-
-Basically, after joining the second node Consul tells us that it can not yet
-start the cluster. But after joining the third node, it tries to bootstrap the
-cluster, elects a [leader
-node](https://www.consul.io/docs/internals/architecture.html) and marks the 3
-nodes as healthy.
-
-So now we have our 3 servers cluster up and running. Note however, that we did
-not specify any port mapping information on any of the three nodes. This means
-that we would have no way of accessing the cluster from outside.
-Luckily this is not a problem because with our cluster running we can now join
-any number of nodes in client mode and interact with the cluster through those
-clients. Lets join the first client node with:
-
-{% highlight bash %}
-docker run -d -p 8400:8400 -p 8500:8500 -p 8600:53/udp --name node4 -h node4 progrium/consul -join $JOIN_IP
-{% endhighlight %}
-
-We can now interact with the cluster through our client node. So, for instance,
-we can do a `curl $DOCKER_IP:8500/v1/catalog/nodes` to see the 4 registered
-nodes or we can point our browser to http://$DOCKER_IP:8500 to see a nice UI.
-
-There are lots of other things you can do with Consul (key/value storage and health
-checks for instance) but I won't go into those for now.
-
-## Registrator
+# Introduction
 We've seen how to run a Consul cluster and we've also seen how to register
 services in that cluster. With this in place we could, in principle, start
 running other Docker containers with our services and register those containers
 with the cluster.
 However, who should be responsible for registering those new containers? 
 
-You could let each container know how to register itself with the
-cluster. There are some problems with this approach. First, you give up one of
-the main benefits of using containers: portability. If the logic of how the
-container needs to join the cluster is inside of it then suddenly you can not
-run that same container if you decide to use a different service discovery
-mechanism or if you decide to use no service discovery at all.
-Another potential issue is that containers are supposed to do just one thing and
-do that well. The container that runs your user service should not care about
-how that service will be discovered by others.
-The last problem is that you will not always be in control of all the containers
-you use. One of the strong points of Docker is the huge amount of already
-dockerized applications and services available in their
+You could let each container know how to register itself. There are some
+problems with this approach. First, you give up one of the main benefits of
+using containers: portability. If the logic of how the container needs to join
+the cluster is inside of it then suddenly you can not run that same container if
+you decide to use a different service discovery mechanism or if you decide to
+use no service discovery at all.  Another potential issue is that containers are
+supposed to do just one thing and do that well. The container that runs your
+user service should not care about how that service will be discovered by
+others.  The last problem is that you will not always be in control of all the
+containers you use. One of the strong points of Docker is the huge amount of
+already dockerized applications and services available in their
 [registry](https://hub.docker.com/). Those containers will have no idea about
 your Consul cluster.
 
+# Registrator
 To solve these problems meet
 [registrator](https://github.com/progrium/registrator). It is designed to be run
 as an independent Docker container. It will sit there quietly, watching for new
@@ -311,91 +56,509 @@ service discovery solution. It will also watch for containers that are stopped
 Additionally, it supports pluggable service discovery mechanisms so you are not
 restricted to any particular solution. 
 
-Lets quickly see how we can run registrator together with our Consul cluster. If
-you are still running the 4 nodes cluster that we used before you can stop them.
-For now we'll run a single server cluster, very similarly to how we did it in
-the first part of this post with:
+Lets quickly see how we can run registrator together with our Consul cluster. 
 
-{% highlight bash %}
-$ docker run -p 8400:8400 -p 8500:8500 -p 8600:53/udp -h node1 progrium/consul -server -bootstrap -advertise $DOCKER_IP
+## Setting up our hosts
+So far we have always run our Consul cluster and all our services in just one
+host (the boot2docker VM). In this post I'll try to simulate a more
+"production-like" environment were we might have several hosts, each running one
+or more docker containers with our services and each running a Consul agent.
+
+In order to do this, we'll use Vagrant to create 3 CoreOS VMS running
+locally.
+The Vagrantfile will look like this:
+
+{% highlight text %}
+Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
+  config.vm.box = "yungsang/coreos"
+  config.vm.network "private_network", type: "dhcp"
+
+  number_of_instances = 3
+  (1..number_of_instances).each do |instance_number|
+    config.vm.define "host-#{instance_number}" do |host|
+      host.vm.hostname = "host-#{instance_number}"
+    end
+  end
+end
 {% endhighlight %}
 
-We'll start the registrator container with:
+After you save the Vagrantfile you can start the 3 VMs with `vagrant up`. It
+might take some time the first time while it downloads the CoreOS image. At this
+point you should be able to see the 3 VMs running:
 
 {% highlight bash %}
-$ docker run -v /var/run/docker.sock:/tmp/docker.sock -h registrator progrium/registrator:latest consul://$DOCKER_IP:8500
+$ vagrant status
+
+Current machine states:
+
+host-1             running (virtualbox)
+host-2             running (virtualbox)
+host-3             running (virtualbox)
+
+This environment represents multiple VMs. The VMs are all listed
+above with their current state. For more information about a specific
+VM, run `vagrant status NAME.
 {% endhighlight %}
 
-You'll see a bunch of logs and a message in the end indicating that it is
-waiting for new events.
-Let's now run our python service from [last post]({% post_url 2014-12-07-aws-docker %}).
+We'll now ssh into the first host and check that docker is installed and running
+(which happens by default when you use the CoreOS image):
+
+{% highlight bash %}
+$ vagrant ssh host-1
+
+host-1$ docker info
+Containers: 0
+Images: 0
+Storage Driver: btrfs
+Execution Driver: native-0.2
+Kernel Version: 3.17.2
+Operating System: CoreOS 494.5.0
+{% endhighlight %}
+
+Similarly for the second host:
+
+{% highlight bash %}
+$ vagrant ssh host-2
+
+host-2$ docker info
+Containers: 0
+Images: 0
+Storage Driver: btrfs
+Execution Driver: native-0.2
+Kernel Version: 3.17.2
+Operating System: CoreOS 494.5.0
+{% endhighlight %}
+
+And the third:
+
+{% highlight bash %}
+$ vagrant ssh host-3
+
+host-3$ docker info
+Containers: 0
+Images: 0
+Storage Driver: btrfs
+Execution Driver: native-0.2
+Kernel Version: 3.17.2
+Operating System: CoreOS 494.5.0
+{% endhighlight %}
+
+Now, before we start running all our different containers I wanted to show how
+our hosts look like from a networking point of view. Notice that we specified a
+"private_network" interface for our VMs in our Vagrantfile. This basically means
+that our VMs will be able to communicate with each other as if they were inside
+the same local network. We can see this if we check the network configuration on
+each one:
+
+{% highlight bash %}
+host-1$ ifconfig enp0s8 | grep 'inet ' | awk '{ print $2 }'
+
+172.28.128.3
+{% endhighlight %}
+
+{% highlight bash %}
+host-2$ ifconfig enp0s8 | grep 'inet ' | awk '{ print $2 }'
+
+172.28.128.4
+{% endhighlight %}
+
+{% highlight bash %}
+host-3$ ifconfig enp0s8 | grep 'inet ' | awk '{ print $2 }'
+
+172.28.128.5
+{% endhighlight %}
+
+Each VM has other network adapters, but for now we'll focus on this particular
+one. We can see that all 3 machines are part of the 172.28.128.0/24 network. On
+a production setup the different machines are probably not going to be on the
+same private network but we can still achieve this using virtual networks most
+of the time (VPC on AWS for instance). This is usually a very good idea because
+the public facing IP shoud be firewalled but we don't need that while we
+communicate between our internal services.
+
+## Starting the Consul cluster
+The first thing we'll do is to start our Consul cluster. We are going to use a 3
+node cluster, similarly to how we did it in our previous post.
+I'll show the full docker run commands here, but don't run those yet. I'll show
+a more concise form later on:
+
+{% highlight bash %}
+host-1$ docker run -d -h node1 -v /mnt:/data \
+-p 172.28.128.3:8300:8300 \
+-p 172.28.128.3:8301:8301 \
+-p 172.28.128.3:8301:8301/udp \
+-p 172.28.128.3:8302:8302 \
+-p 172.28.128.3:8302:8302/udp \
+-p 172.28.128.3:8400:8400 \
+-p 172.28.128.3:8500:8500 \
+-p 172.17.42.1:53:53/udp \
+progrium/consul -server -advertise 172.28.128.3 -bootstrap-expect 3
+{% endhighlight %}
+
+In this docker run command, we are binding all Consul's internal ports to the
+private IP address of our first host, except for the DNS port (53) which is
+exposed only on the `docker0` interface (172.17.42.1 by default).
+The reason why we use the docker bridge interface for the DNS server is that we
+want all the containers running on the same host to query this DNS interface,
+but we don't need anyone from outside doing the same. Since each host will be
+running a Consul agent, each container can query its own host.
+We also added the __-advertise__ flag to tell Consul that it should use the
+host's IP instead of the docker container's IP.
+
+On the second host, we'd run the same thing, but passing a -join to the first
+node's IP:
+
+{% highlight bash %}
+host-2$ docker run -d -h node2 -v /mnt:/data \
+-p 172.28.128.4:8300:8300 \
+-p 172.28.128.4:8301:8301 \
+-p 172.28.128.4:8301:8301/udp \
+-p 172.28.128.4:8302:8302 \
+-p 172.28.128.4:8302:8302/udp \
+-p 172.28.128.4:8400:8400 \
+-p 172.28.128.4:8500:8500 \
+-p 172.17.42.1:53:53/udp \
+progrium/consul -server -advertise 172.28.128.4 -join 172.28.128.3
+{% endhighlight %}
+
+Same for the third one:
+
+{% highlight bash %}
+host-3$ docker run -d -h node3 -v /mnt:/data \
+-p 172.28.128.5:8300:8300 \
+-p 172.28.128.5:8301:8301 \
+-p 172.28.128.5:8301:8301/udp \
+-p 172.28.128.5:8302:8302 \
+-p 172.28.128.5:8302:8302/udp \
+-p 172.28.128.5:8400:8400 \
+-p 172.28.128.5:8500:8500 \
+-p 172.17.42.1:53:53/udp \
+progrium/consul -server -advertise 172.28.128.5 -join 172.28.128.3
+{% endhighlight %}
+
+Since the docker run command for each host can be quite large and error prone to
+type in manually, the __progrium/consul__ image comes with a convenient command
+to generate this for you. You can try this on any of the 3 hosts:
+
+{% highlight bash %}
+$ docker run --rm progrium/consul cmd:run 172.28.128.3 -d -v /mnt:/data
+
+eval docker run --name consul -h $HOSTNAME  \
+-p 172.28.128.3:8300:8300   \
+-p 172.28.128.3:8301:8301   \
+-p 172.28.128.3:8301:8301/udp \
+-p 172.28.128.3:8302:8302 \
+-p 172.28.128.3:8302:8302/udp       \
+-p 172.28.128.3:8400:8400  \
+-p 172.28.128.3:8500:8500\
+-p 172.17.42.1:53:53/udp \
+-d -v /mnt:/data  progrium/consul -server -advertise 172.28.128.3 -bootstrap-expect 3
+{% endhighlight %}
+
+Note that this is the exact command we ran on our first host to bootstrap the
+cluster. You can also try the following:
+
+{% highlight bash %}
+$ docker run --rm progrium/consul cmd:run 172.28.128.4:172.28.128.3 -d -v /mnt:/data
+
+eval docker run --name consul -h $HOSTNAME      \
+-p 172.28.128.4:8300:8300 \
+-p 172.28.128.4:8301:8301       \
+-p 172.28.128.4:8301:8301/udp   \
+-p 172.28.128.4:8302:8302      \
+-p 172.28.128.4:8302:8302/udp   \
+-p 172.28.128.4:8400:8400       \
+-p 172.28.128.4:8500:8500       \
+-p 172.17.42.1:53:53/udp      \
+-d -v /mnt:/data progrium/consul -server -advertise 172.28.128.4 -join 172.28.128.3
+{% endhighlight %}
+
+Here we passed 2 IPs to the cmd:run command, first the node's own address (the
+one that will be used for the -advertise) and the second the IP of one of the
+nodes that is already in the cluster (the IP in the -join part).
+Note also that by specifying a second IP the cmd:run command now removed the
+"bootstrap-expect" parameter, which makes sense because otherwise each node
+would start a different cluster.
+
+We can use the 2 forms of the "cmd:run" command above to bootstrap our cluster with a
+lot less typing. First, stop and remove all running containers on each host with
+the following command:
+
+{% highlight bash %}
+$ docker rm -f $(docker ps -aq)
+{% endhighlight %}
+
+Now, on the first host:
+
+{% highlight bash %}
+host-1$ $(docker run --rm progrium/consul cmd:run 172.28.128.3 -d -v /mnt:/data) 
+{% endhighlight %}
+
+For the second node:
+
+{% highlight bash %}
+host-2$ $(docker run --rm progrium/consul cmd:run 172.28.128.4:172.28.128.3 -d -v /mnt:/data) 
+{% endhighlight %}
+
+And the third node:
+
+{% highlight bash %}
+host-3$ $(docker run --rm progrium/consul cmd:run 172.28.128.5:172.28.128.3 -d -v /mnt:/data) 
+{% endhighlight %}
+
+If you take a look at the logs in host-1 with `docker logs consul` you would see
+the both nodes joining and finally Consul starting the cluster and setting the 3
+nodes as healthy.
+
+## Working with Registrator
+
+Now that we have our Consul cluster up and running we can start the registrator container with:
+
+{% highlight bash %}
+host-1$  export HOST_IP=$(ifconfig enp0s8 | grep 'inet ' | awk '{ print $2  }')
+host-1$  docker run -d \
+-v /var/run/docker.sock:/tmp/docker.sock \
+--name registrator -h registrator \
+progrium/registrator:latest consul://$HOST_IP:8500
+{% endhighlight %}
+
+Notice that we are mounting our "/var/run/docker.sock" file to the container.
+This file is a Unix socket, where the docker daemon listens for events. This is
+actually how the docker client (the docker command that you usuaully use) and
+the docker daemon communicate, through a REST API accessible from this socket.
+If you want to learn more about how you can interact with the docker daemon
+through this socket take a look here:
+http://blog.trifork.com/2013/12/24/docker-from-a-distance-the-remote-api/. The
+important thing to know is that by listening on the same port as Docker,
+Registrator is able to know everything that happens with Docker on that host.
+
+If you check the logs of the "registrator" container you'll see a bunch of stuff
+and a message in the end indicating that it is waiting for new events. You
+should run the same commands on the other 2 containers to start registrator on
+those.
+
+To summarize what we have done so far, we have 3 different hosts each running a
+Consul agent and a registrator container. The registrator instance on each host
+watches for changes in docker containers for that host and talks to the local
+Consul agent.
+
+Let's see what happens when we run our python service from 
+[last post]({% post_url 2014-12-07-aws-docker %}). 
 You can do this following the step by step guide on that post, getting the code
 from [this repo](https://github.com/jlordiales/docker-python-service) and
 building the docker image yourself or using the image that is already on the
 public registry `jlordiales/python-micro-service`. I will go with the latter
-option here:
+option here. 
+We'll first run our python container on host-1:
 
 {% highlight bash %}
-$ docker run -d --name service1 -P jlordiales/python-micro-service
+host-1$ docker run -d --name service1 -P jlordiales/python-micro-service
 {% endhighlight %}
 
-If you are watching the registrator container logs you'll see something like
-this: __registrator: added: 62ef17cb1d76 registrator:service1:5000__. We'll now
-query consul to see what happened with our new service:
+Lets see what happened in our registrator container:
 
 {% highlight bash %}
-$ curl $DOCKER_IP:8500/v1/catalog/services
+host-1$ docker logs registrator
 
-{"consul":[],"consul-53":["udp"],"consul-8400":[],"consul-8500":[],"python-micro-service":[]}%
+2015/02/02 18:05:26 registrator: added: a8dc2b849d99 registrator:service1:5000
 {% endhighlight %}
 
-There we have our new service being returned by Consul. We can also query its
-DNS interface:
+Registrator saw that a new container (service1) was started, exposing port 5000
+and it registered it with our Consul cluster. 
+We'll query our cluster now to see if the service was really added there:
 
 {% highlight bash %}
-$ dig @$DOCKER_IP -p 8600 python-micro-service.service.consul. +short
+host-1$ curl 172.28.128.3:8500/v1/catalog/services
 
-192.168.59.103
+{
+  "consul":[],
+  "consul-53":["udp"],
+  "consul-8300":[],
+  "consul-8301":["udp"],
+  "consul-8302":["udp"],
+  "consul-8400":[],
+  "consul-8500":[],
+  "python-micro-service":[]
+}
 {% endhighlight %}
 
-But the IP address alone won't cut it, we'll also need the port where our
-service is exposed inside the host. We can query the DNS interface again but
-this time ask it for a SRV record:
+There it is! Lets get some more details about it:
 
 {% highlight bash %}
-$ dig @$DOCKER_IP -p 8600 -t SRV python-micro-service.service.consul. +short
+host-1$ curl 172.28.128.3:8500/v1/catalog/service/python-micro-service
 
-1 1 49153 node1.node.dc1.consul.
+[
+  {
+    "Node":"host-1",
+    "Address":"172.28.128.3",
+    "ServiceID":"registrator:service1:5000",
+    "ServiceName":"python-micro-service",
+    "ServiceTags":null,
+    "ServicePort":49154
+  }
+]
 {% endhighlight %}
 
-And there we see that we can access our endpoint through port 49153 in our host.
-This port was randomly assigned by Docker because we used the `-P` option when
-we ran the python container.
+One important thing to notice here, as it caused a lot of
+[frustration](https://github.com/progrium/registrator/issues/68) to people
+before. You can see that Registrator used the IP of the host as the service IP
+rather than the IP address of the container. The reason for that is explained in
+[this](https://github.com/bryanlarsen/registrator/commit/0182dd4bdb4cc6b98aa2b80103fd591f65132f46) 
+pull request to update the FAQ (which should be merged IMHO).
 
-Now, what would happen if we stop the container running our service? Lets try
-it:
+In a nutshell, registrator will always use the IP you specified when you run
+your consul agent with the "--advertise" flag. At first, this seems wrong, 
+but it is usually what you want.
+A service in a Docker based production cluster typically has 3 IP addresses.
+The service itself is running in a Docker container, which has an IP address
+assigned by Docker. The host that it's running on will have 3 IP addresses:
+one for the Docker network, an internal private IP address for all hosts in the
+cluster, and a public address on the Internet. Unless you've bridged your
+docker networks, the IP address of the service container is not accessible from
+other hosts in the cluster. Instead you use the "-P" or "-p" option to Docker
+to map the service port onto the host.  You then advertise a Host IP as the
+service IP. The public IP address should be firewalled, so you want the
+internal private IP to be advertised.
+
+Going back to the output of our last curl, we get the private IP of our "host-1"
+which is where our docker container is running and the exposed port on the host
+(49154 in this case). With that information we could call our service from any
+other node in any host, as long as they are able to reach "host-1" through its
+private IP that is.
+
+So what would happen now if we run a second "python-micro-service" container
+from our second host?
 
 {% highlight bash %}
-$ docker stop service1
-$ curl $DOCKER_IP:8500/v1/catalog/services
-
-{"consul":[],"consul-53":["udp"],"consul-8400":[],"consul-8500":[]}% 
+host-2$ docker run -d --name service2 -P jlordiales/python-micro-service
 {% endhighlight %}
 
-Our service is gone from Consul!
+As we saw on the last post, whenever we have a Consul cluster running we can
+query any node (client or server) and the response should always be the same.
+Since we are running our containers in host-1 and host-2, lets query the Consul
+node on host-3:
 
-I think now is a good time to stop and think about what just happened and have
-your mind blown if that hasn't happened yet. We started our Consul cluster
-running as a separate container. We then ran registrator, again in its own
-isolated container, pointing it to Consul. So far nothing fancy going on, but
-then we ran the container with our python endpoint. This container had no idea
+host-3$ curl 172.28.128.5:8500/v1/catalog/service/python-micro-service
+
+[
+  {
+    "Node":"host-1",
+    "Address":"172.28.128.3",
+    "ServiceID":"registrator:service1:5000",
+    "ServiceName":"python-micro-service",
+    "ServiceTags":null,
+    "ServicePort":49154
+  },
+  {
+    "Node":"host-2",
+    "Address":"172.28.128.4",
+    "ServiceID":"registrator:service2:5000",
+    "ServiceName":"python-micro-service",
+    "ServiceTags":null,
+    "ServicePort":49153
+  }
+]
+{% endhighlight %}
+
+We now have two containers offering the same service. Using this information we
+could call either one from host-3:
+
+{% highlight bash %}
+host-3$ curl 172.28.128.3:49154
+
+Hello World from a8dc2b849d99
+
+host-3$ curl 172.28.128.4:49153
+
+Hello World from c9ca6addfdb0
+{% endhighlight %}
+
+Lets try one more thing: using Consul's DNS interface from a different container
+to ping our service. We'll run a simple busybox container in host-3:
+
+{% highlight bash %}
+host-3$  docker run --dns 172.17.42.1 --dns 8.8.8.8 --dns-search service.consul
+--rm --name ping_test -it busybox 
+{% endhighlight %}
+
+The "--dns" parameter allows us to use a custom DNS server for our container. By
+default the container will use the same DNS servers as its host. In our case we
+want it to use the docker bridge interface (172.17.42.1) first and then, if it
+can not find the host there go to Google's DNS (8.8.8.8).
+Finally, the "dns-search" option makes it easier to query for our services. For
+instance, instead of querying for "python-micro-service.service.consul" we can
+just query for "python-micro-service".
+Let's try to ping our service from the new busybox container:
+
+{% highlight bash %}
+$ ping -qc 1 python-micro-service
+
+PING python-micro-service (172.28.128.4): 56 data bytes
+
+--- python-micro-service ping statistics ---
+1 packets transmitted, 1 packets received, 0% packet loss
+round-trip min/avg/max = 2.391/2.391/2.391 ms
+{% endhighlight %}
+
+It effectively resolved our service name to one of the hosts where it is
+currently running. If we keep running the same "ping" command multiple times we
+will eventually see that it will resolve the hostname to 172.28.128.3, which is
+the other host where our service is running.
+This is well explained in the documentation but Consul will load balance between
+all nodes running the same service as long as they are healthy. 
+
+Of course, if we stop a running container Registrator will notice it and also
+remove the service from Consul. We can see that if we stop the container running
+in host-1:
+
+{% highlight bash %}
+host-1$ docker stop service1
+{% endhighlight %}
+
+And then query again from host-3 like we did before (you can do the same from
+host-1, it doesn't matter):
+
+{% highlight bash %}
+host-3$ curl 172.28.128.5:8500/v1/catalog/service/python-micro-service
+
+[
+  {
+    "Node":"host-2",
+    "Address":"172.28.128.4",
+    "ServiceID":"registrator:service2:5000",
+    "ServiceName":"python-micro-service",
+    "ServiceTags":null,
+    "ServicePort":49153
+  }
+]
+{% endhighlight %}
+
+# Conclusion
+In this post we have seen an approach that allows to have our containers
+registered with the service discovery solution of our choice without the need to
+couple both. Instead, an intermediary tool called Registrator manages this for
+all the containers running on a particular host.
+
+We used Vagrant to create 3 different virtual hosts all under the same private
+network. We started our 3 nodes Consul cluster, one consul container running on
+each host. We did the same thing for Registrator, one container running on each
+host pointing to its local consul container.
+Then we ran the container with our python endpoint. This container had no idea
 about Consul or registrator. We used exactly the same `docker run` command that
 we would've used if we were running that container alone.
 And yet registrator was notified about this new container and automatically
-registered it with the correct IP and port information on Consul. 
+registered it with the correct IP and port information on Consul. Moreover, when
+we ran another container in another host from the same docker image Consul saw
+that it was the same service and started to load balance between them.
 When we stopped our container registrator also saw that and automatically
 deregistered it from the cluster.
 
 This is amazing because we can keep our containers completely ignorant about how
-they will be discovered or any other piece of infrastructure information.
+they will be discovered or any other piece of infrastructure information. We can
+keep them portable and we move the logic of registration to a separate component
+running in a separate container.
 
+The capability to run multiple containers of the same service and have Consul
+automatically load balancing between them, together with its health-checks and
+its DNS interface allow us to deploy and run really complex configurations of
+services in an extremely transparent and simplified way.
