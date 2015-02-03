@@ -13,12 +13,12 @@ tags:
 - Consul
 - Registrator
 ---
-In the previous post we talked about Consul and how it can help us towards a 
-highly available and efficient service discovery. We saw how to run a Consul
-cluster, register services, query through its HTTP API as well as its DNS
-interface and use the distributed key/value store. 
-One thing we missed though was how to register the different services we run as
-docker containers with the Cluster. In this post I'm going to talk about
+In the [previous post]({% post_url 2015-01-23-docker-consul %}) we talked about
+Consul and how it can help us towards a highly available and efficient service
+discovery. We saw how to run a Consul cluster, register services, query through
+its HTTP API as well as its DNS interface and use the distributed key/value
+store.  One thing we missed though was how to register the different services we
+run as docker containers with the Cluster. In this post I'm going to talk about
 [Registrator](https://github.com/progrium/registrator), an amazing tool that we
 can run as a docker container whose responsibility is to make sure that new
 containers are registered and deregistered automatically from our service
@@ -28,7 +28,7 @@ discovery tool.
 We've seen how to run a Consul cluster and we've also seen how to register
 services in that cluster. With this in place we could, in principle, start
 running other Docker containers with our services and register those containers
-with the cluster.
+with Consul.
 However, who should be responsible for registering those new containers? 
 
 You could let each container know how to register itself. There are some
@@ -68,7 +68,7 @@ In order to do this, we'll use Vagrant to create 3 CoreOS VMS running
 locally.
 The Vagrantfile will look like this:
 
-{% highlight text %}
+{% highlight ruby %}
 Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
   config.vm.box = "yungsang/coreos"
   config.vm.network "private_network", type: "dhcp"
@@ -82,8 +82,8 @@ Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
 end
 {% endhighlight %}
 
-After you save the Vagrantfile you can start the 3 VMs with `vagrant up`. It
-might take some time the first time while it downloads the CoreOS image. At this
+After you save the Vagrantfile you can start the 3 VMs with `vagrant up`.  It
+might take a while the first time while it downloads the CoreOS image. At this
 point you should be able to see the 3 VMs running:
 
 {% highlight bash %}
@@ -97,7 +97,7 @@ host-3             running (virtualbox)
 
 This environment represents multiple VMs. The VMs are all listed
 above with their current state. For more information about a specific
-VM, run `vagrant status NAME.
+VM, run vagrant status NAME.
 {% endhighlight %}
 
 We'll now ssh into the first host and check that docker is installed and running
@@ -178,7 +178,7 @@ communicate between our internal services.
 
 ## Starting the Consul cluster
 The first thing we'll do is to start our Consul cluster. We are going to use a 3
-node cluster, similarly to how we did it in our previous post.
+node cluster, similarly to how we did it in our [previous post]({% post_url 2015-01-23-docker-consul %}).
 I'll show the full docker run commands here, but don't run those yet. I'll show
 a more concise form later on:
 
@@ -202,10 +202,10 @@ The reason why we use the docker bridge interface for the DNS server is that we
 want all the containers running on the same host to query this DNS interface,
 but we don't need anyone from outside doing the same. Since each host will be
 running a Consul agent, each container can query its own host.
-We also added the __-advertise__ flag to tell Consul that it should use the
+We also added the `-advertise` flag to tell Consul that it should use the
 host's IP instead of the docker container's IP.
 
-On the second host, we'd run the same thing, but passing a -join to the first
+On the second host, we'd run the same thing, but passing a `-join` to the first
 node's IP:
 
 {% highlight bash %}
@@ -274,10 +274,10 @@ eval docker run --name consul -h $HOSTNAME      \
 {% endhighlight %}
 
 Here we passed 2 IPs to the cmd:run command, first the node's own address (the
-one that will be used for the -advertise) and the second the IP of one of the
-nodes that is already in the cluster (the IP in the -join part).
+one that will be used for the `-advertise`) and the second the IP of one of the
+nodes that is already in the cluster (the IP in the `-join` part).
 Note also that by specifying a second IP the cmd:run command now removed the
-"bootstrap-expect" parameter, which makes sense because otherwise each node
+`-bootstrap-expect` parameter, which makes sense because otherwise each node
 would start a different cluster.
 
 We can use the 2 forms of the "cmd:run" command above to bootstrap our cluster with a
@@ -307,7 +307,7 @@ host-3$ $(docker run --rm progrium/consul cmd:run 172.28.128.5:172.28.128.3 -d -
 {% endhighlight %}
 
 If you take a look at the logs in host-1 with `docker logs consul` you would see
-the both nodes joining and finally Consul starting the cluster and setting the 3
+both nodes joining and finally Consul starting the cluster and setting the 3
 nodes as healthy.
 
 ## Working with Registrator
@@ -323,13 +323,14 @@ progrium/registrator:latest consul://$HOST_IP:8500
 {% endhighlight %}
 
 Notice that we are mounting our "/var/run/docker.sock" file to the container.
-This file is a Unix socket, where the docker daemon listens for events. This is
-actually how the docker client (the docker command that you usuaully use) and
-the docker daemon communicate, through a REST API accessible from this socket.
-If you want to learn more about how you can interact with the docker daemon
-through this socket take a look here:
-http://blog.trifork.com/2013/12/24/docker-from-a-distance-the-remote-api/. The
-important thing to know is that by listening on the same port as Docker,
+This file is a [Unix socket](http://en.wikipedia.org/wiki/Unix_domain_socket),
+where the docker daemon listens for events. This is actually how the docker
+client (the docker command that you usually use) and the docker daemon
+communicate, through a REST API accessible from this socket. If you want to
+learn more about how you can interact with the docker daemon through this socket
+take a look
+[here](http://blog.trifork.com/2013/12/24/docker-from-a-distance-the-remote-api/).
+The important thing to know is that by listening on the same port as Docker,
 Registrator is able to know everything that happens with Docker on that host.
 
 If you check the logs of the "registrator" container you'll see a bunch of stuff
@@ -342,8 +343,9 @@ Consul agent and a registrator container. The registrator instance on each host
 watches for changes in docker containers for that host and talks to the local
 Consul agent.
 
+## Starting our containers
 Let's see what happens when we run our python service from 
-[last post]({% post_url 2014-12-07-aws-docker %}). 
+[the first post]({% post_url 2014-12-07-aws-docker %}) in this Docker series. 
 You can do this following the step by step guide on that post, getting the code
 from [this repo](https://github.com/jlordiales/docker-python-service) and
 building the docker image yourself or using the image that is already on the
@@ -407,7 +409,7 @@ rather than the IP address of the container. The reason for that is explained in
 pull request to update the FAQ (which should be merged IMHO).
 
 In a nutshell, registrator will always use the IP you specified when you run
-your consul agent with the "--advertise" flag. At first, this seems wrong, 
+your consul agent with the `-advertise` flag. At first, this seems wrong, 
 but it is usually what you want.
 A service in a Docker based production cluster typically has 3 IP addresses.
 The service itself is running in a Docker container, which has an IP address
@@ -421,10 +423,10 @@ service IP. The public IP address should be firewalled, so you want the
 internal private IP to be advertised.
 
 Going back to the output of our last curl, we get the private IP of our "host-1"
-which is where our docker container is running and the exposed port on the host
-(49154 in this case). With that information we could call our service from any
-other node in any host, as long as they are able to reach "host-1" through its
-private IP that is.
+which is where our docker container is running with an exposed port (49154 in
+this case). With that information we could call our service from any other node
+in any host, as long as they are able to reach "host-1" through its private IP
+that is.
 
 So what would happen now if we run a second "python-micro-service" container
 from our second host?
@@ -433,11 +435,12 @@ from our second host?
 host-2$ docker run -d --name service2 -P jlordiales/python-micro-service
 {% endhighlight %}
 
-As we saw on the last post, whenever we have a Consul cluster running we can
-query any node (client or server) and the response should always be the same.
-Since we are running our containers in host-1 and host-2, lets query the Consul
-node on host-3:
+As we saw on the [last post]({% post_url 2015-01-23-docker-consul %}), whenever
+we have a Consul cluster running we can query any node (client or server) and
+the response should always be the same.  Since we are running our containers in
+host-1 and host-2, lets query the Consul node on host-3:
 
+{% highlight bash %}
 host-3$ curl 172.28.128.5:8500/v1/catalog/service/python-micro-service
 
 [
@@ -473,6 +476,7 @@ host-3$ curl 172.28.128.4:49153
 Hello World from c9ca6addfdb0
 {% endhighlight %}
 
+## Integrating our containers with Consul's DNS
 Lets try one more thing: using Consul's DNS interface from a different container
 to ping our service. We'll run a simple busybox container in host-3:
 
