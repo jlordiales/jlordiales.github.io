@@ -401,6 +401,7 @@ host-1$ curl 172.28.128.3:8500/v1/catalog/service/python-micro-service
 ]
 {% endhighlight %}
 
+<a name="advertise"/>
 One important thing to notice here, as it caused a lot of
 [frustration](https://github.com/progrium/registrator/issues/68) to people
 before. You can see that Registrator used the IP of the host as the service IP
