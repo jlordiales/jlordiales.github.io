@@ -11,8 +11,8 @@ share: true
 ---
 
 They say the best way to learn something is to try to explain it to someone else
-assumming that they have no previous knowledge about the subject.
-That was the main driver almost two years ago for me to start writting this
+assuming that they have no previous knowledge about the subject.
+That was the main driver almost two years ago for me to start writing this
 blog.
 Although I haven't had as much time as I would have wished to write, I can now
 say with confidence that the statement of the previous paragraph is completely
