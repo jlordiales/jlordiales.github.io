@@ -1,0 +1,332 @@
+---
+author: jlordiales
+comments: true
+share: true
+date: 2016-05-16
+layout: post
+title: Running docker from your Unit Tests
+categories:
+- Docker
+- Testing
+tags:
+- Java
+- Java 8
+- Docker
+- Spock
+- JUnit
+---
+
+It's been a while since the last post eh? Almost a full year now. Let's see if I
+still remember how to do this.
+Going straight into the post, I want to quickly show you how you can run any
+Docker container (or a set of containers as part of a docker-compose setup) from
+a simple [JUnit Rule](https://github.com/junit-team/junit4/wiki/Rules) using a
+very handy library called [TestContainers](http://testcontainers.viewdocs.io/testcontainers-java/).
+
+# Introduction
+Running an external dependency in a Unit Test as a Docker container? That's
+blasphemy! Everyone knows that you simply don't run external dependencies as
+part of your unit tests. You are supposed to mock all external dependencies so
+that your tests are fast, repeatable and self-contained.
+
+For the most part I agree. Your tests should be extremely fast and test one
+single aspect of one single class and, if you are [doing it
+right](http://martinfowler.com/articles/injection.html), you should be able to
+mock away other parts of your stack. 90% of the time at least...
+
+First of all, I don't think the line between what's a unit test and what's an
+integration test is so well defined as many would like to believe. The fact that
+the internet if full of "unit tests vs integration tests" flame wars is living
+proof of that.  And this line is becoming even blurrier with technologies like
+Docker that allows you to run almost anything in a self-contained, portable and
+fast way.
+
+Just to be clear, I'm not even remotely against mocks being [used
+properly](http://www.jmock.org/oopsla2004.pdf). "Properly" is the keyword here.
+Abusing mocks leads to incredibly hard to read and maintain tests where we are
+basically repeating the implementation in the form of verification calls: "verify
+that first we call method `X` with parameter `foo` and that then we call method
+`Y` with the result of that and then....".
+
+A classic example of this is unit tests for your persistence logic. 
+If you want to test that the code that reads and writes to your DB is actually
+doing that correctly mocking is probably not the best option. Most people
+will run an in-memory H2 database that they can start and shutdown easily from
+their test setup. Does this work ok? Absolutely, it goes a long way to verify
+that your code is behaving
+as you expect it to be. But you don't really run H2 in production, do you? 
+Sure, H2 has some [compatibility
+modes](http://www.h2database.com/html/features.html) that allows you to simulate
+some of the vendor specific features but certainly not all of them.
+
+Back a few years when the alternatives were to either connect to a remote shared
+DB (ouch!), have each developer install a local DB or spin up a pretty heavy and
+resource consuming VM this was as good as you could hope for and it became
+common practice.  
+Now comes the container revolution, allowing you to run any DB
+you want with just one command, starting up in sub-seconds. Why not take
+advantage of this?  And after all, is it really so different from running an
+in-memory DB? The only thing you need is to have Docker installed (which these
+days is as common as having a text editor for developers) and you are up and
+running in pretty much the same time it takes to start H2 (without counting the
+network transfer to pull the image the first time of course).
+
+You can argue that these are not really Unit Tests, at least not in the more
+strict sense. And again, I can agree with that (the title of the post is
+purposely misleading).  That's fine, you can call them something else:
+integration tests, user acceptance tests, component tests, API tests. Whatever
+rocks your boat. The point is that at some point you NEED to tests your
+integration points. And, despite its name, JUnit and similar frameworks
+([Spock](http://spockframework.github.io/spock/docs/1.0/index.html) anyone?) is
+not only useful for Unit Tests, but for any of the ones I mentioned before as
+well.
+
+So with that out of the way, let's move into the tool.
+
+# TestContainers
+This pretty nifty library basically allows you to run any container (or a set of
+them) in a very simple way. You should definitely check their [GitHub
+repo](https://github.com/testcontainers/testcontainers-java).
+The library uses the Docker daemon REST API to talk to your locally running
+daemon and start, stop and operate on your containers. 
+
+You need to run JDK 1.8 and have Docker installed of course. As of now it seems
+to offer support for OS X and Linux, with support for Windows being in alpha
+status.
+So how do you actually use it? Let's jump into the examples, which by the way
+are available on
+[GitHub](https://github.com/jlordiales/testcontainers-examples.git)
+
+## The "production" code
+Since I mentioned databases at the beginning of the post, let's go with that. We
+have our standard DAO class:
+
+{% highlight java linenos=table %}
+public interface UserDao {
+    @SqlUpdate("create table users (id varchar(64) primary key, name varchar(100))")
+    void createUserTable();
+
+    @SqlUpdate("insert into users (id, name) values (:id, :name)")
+    void insert(@Bind("id") String id, @Bind("name") String name);
+
+    @SqlQuery("select name from users where id = :id")
+    String findNameById(@Bind("id") String id);
+}
+{% endhighlight %}
+
+And a Storage class that serves as a facade for the dao:
+
+{% highlight java linenos=table %}
+public class Storage {
+    private final DBI db;
+
+    public Storage(DBI db) {
+        this.db = db;
+    }
+
+    public void createTable() {
+        db.onDemand(UserDao.class).createUserTable();
+    }
+
+    public String insert(String name) {
+        String id = UUID.randomUUID().toString();
+        db.onDemand(UserDao.class).insert(id, name);
+        return id;
+    }
+
+    public String getNameById(String id) {
+        return db.onDemand(UserDao.class).findNameById(id);
+    }
+}
+{% endhighlight %}
+
+## The tests
+How would we go about testing this incredibly complex piece of code? The first
+approach is to mock the DBI instance that we pass to
+the constructor of our Storage class and verify that we call the proper methods
+on it.
+
+{% highlight java linenos=table %}
+class StorageMockTest extends Specification {
+    def userDao = Mock(UserDao)
+    def db = Mock(DBI)
+    def store = new Storage(db)
+
+    def setup() {
+        db.onDemand(UserDao.class) >> userDao
+    }
+
+    def "It is possible to get a name by id after inserting it on the DB"() {
+        given:
+        def name = "John Doe"
+        def id = store.insert(name)
+        userDao.findNameById(id) >> name
+
+        expect:
+        store.getNameById(id) == name
+    }
+}
+{% endhighlight %}
+
+That works and is pretty straightforward, isn't it? There are a couple of problems
+though:
+  * We need to know the internal details of the class in order to verify the
+    desired behaviour. We need to know that there's a `UserDao` class and that,
+    internally, the _Store_ calls the _onDemand_ method that should return this
+    dao.
+  * If we introduce a bug on our DAO SQL query (say by changing `users` for
+    `user` for the table name) this test will never catch it.
+
+
+These drawbacks become more of a problem as the SQL on our DAO class becomes
+more complex of course.
+
+Let's take a look at how this same test would look like when using
+TestContainers to run an actual Postgres database.
+
+{% highlight java linenos=table %}
+class StorageGenericContainerTest extends Specification {
+    static final int POSTGRES_PORT = 5432
+    @Shared
+    DBI db
+    @Shared
+    Storage store
+    @ClassRule
+    @Shared
+    GenericContainer postgres =
+        new GenericContainer("postgres:9.5").withExposedPorts(POSTGRES_PORT)
+                                            .withEnv("POSTGRES_DATABASE", "test")
+                                            .withEnv("POSTGRES_USER", "test")
+                                            .withEnv("POSTGRES_PASSWORD", "test")
+
+    def setupSpec() {
+        db = new DBI(getJdbcUrl(), "test", "test")
+        store = new Storage(db)
+        store.createTable()
+    }
+
+    def setup() {
+        truncateDB()
+    }
+
+    def getJdbcUrl() {
+        "jdbc:postgresql://${postgres.containerIpAddress}:${postgres.getMappedPort(POSTGRES_PORT)}/test"
+    }
+
+    def truncateDB() {
+        Handle handle = db.open()
+        handle.connection.setAutoCommit(false)
+        handle.update("truncate table users")
+        handle.commit()
+        handle.close()
+    }
+
+    def "It is possible to get a name by id after inserting it on the DB"() {
+        given:
+        def name = "John Doe"
+        def id = store.insert(name)
+
+        expect:
+        store.getNameById(id) == name
+    }
+}
+{% endhighlight %}
+
+The most important part in the snippet above can be seen on lines 9-13. We use a
+JUnit Rule to say that we want to run a generic docker container for the image
+`postgres:9.5` and we configure the exposed ports and some environment
+variables. This is a class rule, which means that it will start the container
+before any of the tests start and it will stop it once they all finish.
+Alternatively we could run a completely fresh container before each test by
+using `@Rule` instead of `@ClassRule`.
+It is also worth noting that we can use JUnit rules in Spock out of the box.
+
+The class rule is equivalent to running `docker run -p 5432 -e
+POSTGRES_DATABASE=test -e POSTGRES_USER=test -e POSTGRES_PASSWORD=test
+postgres:9.5` directly from the terminal, with the obvious advantage that you
+don't have to concern with starting/stopping the container. 
+
+The next piece of magic is the `getJdbcUrl` method on line 25. Using the
+previously defined `GenericContainer` variable we can get the IP and the mapped
+port of the container. This is really important for 2 main reasons:
+  * Getting the IP the test needs to use to talk to the container will work
+    regardless of whether you are running natively on Linux (in which case
+    you'll likely use localhost) or using docker-machine on OS X.
+  * You don't need to map the exposed port of the container to any specific port
+    on the host.
+
+These 2 things means that the test can remain portable and will work just as
+well on your dev environment regardless of what platform you are using and on
+the CI.
+
+So how does this version compare to the first one we saw where we were mocking
+the DB? Is it slower? Of course it is, there's no way around that. But this
+delay is only on the initial setup of the test. This time will be amortized as
+you keep adding new scenarios to the spec.  Once the container is running, each
+test itself runs in < 100 milliseconds.  But, most importantly, we are testing
+the actual code that writes and reads from the database. We are not exposing any
+implementation details to the test and if (when) we introduce a regression on
+our DAO this simple test will catch it.
+Of course we could have accomplished the same thing by running an in-memory H2
+database, as we discussed in the beginning. But the TestContainers approach has
+the added benefit that we are making absolutely sure that our code is working
+against the same type of DB that we'll run in production. If, for some reason,
+we absolutely have to use a vendor specific feature (although you should always
+avoid that as far as possible) then this becomes critical for your tests.
+
+Testing your database integration is so common and such an attractive use case
+for a library like this that the guys from TestContainers have provided
+convenience classes and methods just for this. Let's take a look at this
+equivalent example:
+
+{% highlight java linenos=table %}
+class StorageDBContainerTest extends Specification {
+    @Shared
+    DBI db
+    @Shared
+    Storage store
+    @ClassRule
+    @Shared 
+    PostgreSQLContainer postgres
+
+    def setupSpec() {
+        db = new DBI(postgres.jdbcUrl, postgres.username, postgres.password)
+        store = new Storage(db)
+        store.createTable()
+    }
+
+    def setup() {
+        truncateDB()
+    }
+
+    def truncateDB() {
+        Handle handle = db.open()
+        handle.connection.setAutoCommit(false)
+        handle.update("truncate table users")
+        handle.commit()
+        handle.close()
+    }
+
+    def "It is possible to get a name by id after inserting it on the DB"() {
+        given:
+        def name = "John Doe"
+        def id = store.insert(name)
+
+        expect:
+        store.getNameById(id) == name
+    }
+}
+{% endhighlight %}
+
+Here, instead of creating a generic container and having to specify which image
+to use, the port and the environment variables we simply say we want to use a
+`PostgreSQLContainer`. Likewise, this class provides a convenience method to get
+the fully formatted JDBC url that we can just pass to the constructor of our DBI
+instance as well as the user and password to connect to the database.
+You can see a list and some examples of all supported databases at
+http://testcontainers.viewdocs.io/testcontainers-java/usage/database_containers/
+Of course, if the database you need is not supported out of the box by these
+wrappers you can always run them using a `GenericContainer` yourself.
+
+## TestContainers for docker-compose
+
