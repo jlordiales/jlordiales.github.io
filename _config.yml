@@ -41,7 +41,7 @@ markdown:    kramdown
 
 # https://github.com/mojombo/jekyll/wiki/Permalinks
 
-permalink: /:year/:month/:day/:title
+permalink: /:year/:month/:day/:title/
 
 # Amount of post to show on home page
 paginate: 10
