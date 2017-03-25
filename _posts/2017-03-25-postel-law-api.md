@@ -4,7 +4,7 @@ comments: true
 share: true
 date: 2017-03-25
 layout: post
-title: Why you should ignore unknown fields in your API
+title: Why you should follow the robustness principle in your APIs
 tags:
 - API
 - Postel law
