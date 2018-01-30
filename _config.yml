@@ -46,7 +46,9 @@ permalink: /:year/:month/:day/:title/
 # Amount of post to show on home page
 paginate: 10
 
-gems: [jekyll-paginate]
+gems: 
+  - jekyll-paginate 
+  - jekyll-gist
 
 kramdown:
   auto_ids: true
@@ -55,6 +57,10 @@ kramdown:
   toc_levels: 1..6
   smart_quotes:   lsquo,rsquo,ldquo,rdquo
   enable_coderay: false
+
+jekyll-crosspost_to_medium:
+  status: draft
+  license: cc-40-by-sa
 
 include: [".htaccess"]
 exclude: ["vendor","lib", "config.rb", "Capfile", "config", "Gemfile", "Gemfile.lock", "README.md", "LICENSE", "log", "Rakefile", "Rakefile.rb", "tmp", "less", "*.sublime-project", "*.sublime-workspace", "test", "spec", "Gruntfile.js", "package.json", "node_modules"]
